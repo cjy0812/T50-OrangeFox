@@ -230,13 +230,27 @@ jobs:
 
           mka adbd ${{ github.event.inputs.BUILD_TARGET }} \
             -j$(nproc --all)
+          BUILD_EXIT=$?
 
           echo
           echo "========== OUTPUT =========="
-          find out/target/product/${{ github.event.inputs.DEVICE_NAME }} -maxdepth 1 -type f
+          find out/target/product/${{ github.event.inputs.DEVICE_NAME }} -maxdepth 1 -type f || true
           ls -lh out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img || true
           ls -lh out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz || true
           echo "============================"
+
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "ERROR: mka exited with code $BUILD_EXIT"
+            exit $BUILD_EXIT
+          fi
+
+          IMG_COUNT=$(ls out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img 2>/dev/null | wc -l)
+          if [ "$IMG_COUNT" -eq 0 ]; then
+            echo "ERROR: No .img files produced — build likely failed silently"
+            exit 1
+          fi
+
+          echo "SUCCESS: $IMG_COUNT image(s) produced"
 
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
