@@ -238,6 +238,7 @@ jobs:
         echo "============================"
 
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      shell: bash
 
     - name: 上传到 Release
       uses: softprops/action-gh-release@v2
