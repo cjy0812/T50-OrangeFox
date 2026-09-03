@@ -199,6 +199,7 @@ jobs:
 
     - name: 构建 OrangeFox recovery
       run: |
+        set +e
         export USE_CCACHE=1
         export CCACHE_EXEC=$(which ccache)
         export CCACHE_DIR=~/.ccache
@@ -238,7 +239,6 @@ jobs:
         echo "============================"
 
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
-      shell: bash
 
     - name: 上传到 Release
       uses: softprops/action-gh-release@v2
