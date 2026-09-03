@@ -4,52 +4,52 @@ on:
   workflow_dispatch:
     inputs:
       FOX_BRANCH:
-        description: 'OrangeFox 分支 (12.1 / 14.1)'
+        description: "OrangeFox 分支 (12.1 / 14.1)"
         required: true
-        default: '12.1'
+        default: "12.1"
 
       DEVICE_TREE_URL:
-        description: '设备树 URL'
+        description: "设备树 URL"
         required: true
-        default: 'https://github.com/cjy0812/T50_OrangeFox_Device_Tree'
+        default: "https://github.com/cjy0812/T50_OrangeFox_Device_Tree"
 
       DEVICE_TREE_BRANCH:
-        description: '设备树分支'
+        description: "设备树分支"
         required: true
-        default: 'main'
+        default: "main"
 
       DEVICE_PATH:
-        description: '设备路径'
+        description: "设备路径"
         required: true
-        default: 'device/alps/tb8786p1_64_k510_wifi'
+        default: "device/alps/tb8786p1_64_k510_wifi"
 
       COMMON_TREE_URL:
-        description: '通用树 URL (如无通用树，请留空)'
+        description: "通用树 URL (如无通用树，请留空)"
         required: false
 
       COMMON_PATH:
-        description: '通用树路径 (如无通用树，请留空)'
+        description: "通用树路径 (如无通用树，请留空)"
         required: false
 
       DEVICE_NAME:
-        description: '设备名称'
+        description: "设备名称"
         required: true
-        default: 'tb8786p1_64_k510_wifi'
+        default: "tb8786p1_64_k510_wifi"
 
       MAKEFILE_NAME:
-        description: 'Makefile 名称 (twrp_<codename>)'
+        description: "Makefile 名称 (twrp_<codename>)"
         required: true
-        default: 'twrp_tb8786p1_64_k510_wifi'
+        default: "twrp_tb8786p1_64_k510_wifi"
 
       BUILD_TARGET:
-        description: '构建目标 (bootimage/recoveryimage/vendorbootimage)'
+        description: "构建目标 (bootimage/recoveryimage/vendorbootimage)"
         required: true
-        default: 'vendorbootimage'
+        default: "vendorbootimage"
 
       ENABLE_SSH:
-        description: '是否开启 SSH 调试'
+        description: "是否开启 SSH 调试"
         required: true
-        default: 'false'
+        default: "false"
 
 jobs:
   build:
@@ -61,199 +61,199 @@ jobs:
       contents: write
 
     steps:
+      - name: 显示运行参数
+        run: |
+          echo "::group::用户环境变量"
+          echo "OrangeFox 分支: ${{ github.event.inputs.FOX_BRANCH }}"
+          echo "设备树 URL: ${{ github.event.inputs.DEVICE_TREE_URL }}"
+          echo "设备树分支: ${{ github.event.inputs.DEVICE_TREE_BRANCH }}"
+          echo "设备路径: ${{ github.event.inputs.DEVICE_PATH }}"
+          echo "设备名称: ${{ github.event.inputs.DEVICE_NAME }}"
+          echo "Makefile 名称: ${{ github.event.inputs.MAKEFILE_NAME }}"
+          echo "构建目标: ${{ github.event.inputs.BUILD_TARGET }}"
+          echo "::endgroup::"
 
-    - name: 显示运行参数
-      run: |
-        echo "::group::用户环境变量"
-        echo "OrangeFox 分支: ${{ github.event.inputs.FOX_BRANCH }}"
-        echo "设备树 URL: ${{ github.event.inputs.DEVICE_TREE_URL }}"
-        echo "设备树分支: ${{ github.event.inputs.DEVICE_TREE_BRANCH }}"
-        echo "设备路径: ${{ github.event.inputs.DEVICE_PATH }}"
-        echo "设备名称: ${{ github.event.inputs.DEVICE_NAME }}"
-        echo "Makefile 名称: ${{ github.event.inputs.MAKEFILE_NAME }}"
-        echo "构建目标: ${{ github.event.inputs.BUILD_TARGET }}"
-        echo "::endgroup::"
+      - name: 清理非必要软件包
+        uses: rokibhasansagar/slimhub_actions@main
 
-    - name: 清理非必要软件包
-      uses: rokibhasansagar/slimhub_actions@main
+      - name: 检出代码
+        uses: actions/checkout@v7
 
-    - name: 检出代码
-      uses: actions/checkout@v7
+      - name: 准备环境
+        run: |
+          DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
+            linux-modules-extra-$(uname -r) \
+            gperf gcc-multilib gcc-10-multilib \
+            g++-multilib g++-10-multilib \
+            libc6-dev lib32ncurses-dev \
+            x11proto-core-dev libx11-dev tree \
+            lib32z-dev libgl1-mesa-dev libxml2-utils \
+            xsltproc bc ccache \
+            lib32readline-dev lib32z1-dev \
+            liblz4-tool libncurses-dev \
+            libsdl1.2-dev build-essential \
+            libgtk-3-dev libglu1-mesa-dev \
+            freeglut3-dev git libxml2 lzop \
+            pngcrush schedtool squashfs-tools \
+            imagemagick libbz2-dev lzma \
+            ncftp qemu-user-static \
+            libstdc++-10-dev libncurses6 \
+            python3 tar
 
-    - name: 准备环境
-      run: |
-        DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
-          linux-modules-extra-$(uname -r) \
-          gperf gcc-multilib gcc-10-multilib \
-          g++-multilib g++-10-multilib \
-          libc6-dev lib32ncurses-dev \
-          x11proto-core-dev libx11-dev tree \
-          lib32z-dev libgl1-mesa-dev libxml2-utils \
-          xsltproc bc ccache \
-          lib32readline-dev lib32z1-dev \
-          liblz4-tool libncurses-dev \
-          libsdl1.2-dev build-essential \
-          libgtk-3-dev libglu1-mesa-dev \
-          freeglut3-dev git libxml2 lzop \
-          pngcrush schedtool squashfs-tools \
-          imagemagick libbz2-dev lzma \
-          ncftp qemu-user-static \
-          libstdc++-10-dev libncurses6 \
-          python3 tar
+      - name: 安装 OpenJDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 11
 
-    - name: 安装 OpenJDK
-      uses: actions/setup-java@v5
-      with:
-        distribution: zulu
-        java-version: 11
+      - name: 设置 SSH 密钥
+        if:
+          ${{ startsWith(github.event.inputs.DEVICE_TREE_URL, 'git@github.com') ||
+          startsWith(github.event.inputs.COMMON_TREE_URL, 'git@github.com') }}
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: 设置 SSH 密钥
-      if: ${{ startsWith(github.event.inputs.DEVICE_TREE_URL, 'git@github.com') ||
-              startsWith(github.event.inputs.COMMON_TREE_URL, 'git@github.com') }}
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: |
-          ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: 安装 repo
+        run: |
+          mkdir ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo ln -sf ~/bin/repo /usr/bin/repo
 
-    - name: 安装 repo
-      run: |
-        mkdir ~/bin
-        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-        chmod a+x ~/bin/repo
-        sudo ln -sf ~/bin/repo /usr/bin/repo
+      - name: 初始化工作目录
+        run: |
+          mkdir workspace
+          cd workspace
+          echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+          git config --global user.name "Nico170420"
+          git config --global user.email "b170420nc@gmail.com"
+        id: pwd
 
-    - name: 初始化工作目录
-      run: |
-        mkdir workspace
-        cd workspace
-        echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
-        git config --global user.name "Nico170420"
-        git config --global user.email "b170420nc@gmail.com"
-      id: pwd
+      - name: 缓存 repo
+        uses: actions/cache@v4
+        with:
+          path: |
+            workspace/.repo
+          key: repo-fox-${{ github.event.inputs.FOX_BRANCH }}-${{ runner.os }}
+          restore-keys: |
+            repo-fox-${{ github.event.inputs.FOX_BRANCH }}-
 
-    - name: 缓存 repo
-      uses: actions/cache@v4
-      with:
-        path: |
-          workspace/.repo
-        key: repo-fox-${{ github.event.inputs.FOX_BRANCH }}-${{ runner.os }}
-        restore-keys: |
-          repo-fox-${{ github.event.inputs.FOX_BRANCH }}-
+      - name: 同步 OrangeFox 源码
+        run: |
+          FOX_PATH="${{ steps.pwd.outputs.workspace-folder }}"
+          mkdir -p ~/OrangeFox_sync
+          cd ~/OrangeFox_sync
+          git clone https://gitlab.com/OrangeFox/sync.git
+          cd sync
+          ./orangefox_sync.sh --branch ${{ github.event.inputs.FOX_BRANCH }} --path "$FOX_PATH"
 
-    - name: 同步 OrangeFox 源码
-      run: |
-        FOX_PATH="${{ steps.pwd.outputs.workspace-folder }}"
-        mkdir -p ~/OrangeFox_sync
-        cd ~/OrangeFox_sync
-        git clone https://gitlab.com/OrangeFox/sync.git
-        cd sync
-        ./orangefox_sync.sh --branch ${{ github.event.inputs.FOX_BRANCH }} --path "$FOX_PATH"
+      - name: 克隆设备树
+        run: |
+          cd ${{ steps.pwd.outputs.workspace-folder }}
+          git clone \
+            ${{ github.event.inputs.DEVICE_TREE_URL }} \
+            -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} \
+            ./${{ github.event.inputs.DEVICE_PATH }}
 
-    - name: 克隆设备树
-      run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}
-        git clone \
-          ${{ github.event.inputs.DEVICE_TREE_URL }} \
-          -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} \
-          ./${{ github.event.inputs.DEVICE_PATH }}
+      - name: 克隆通用树
+        if: |
+          github.event.inputs.COMMON_TREE_URL != '' &&
+          github.event.inputs.COMMON_PATH != ''
+        run: |
+          cd ${{ steps.pwd.outputs.workspace-folder }}
+          git clone \
+            ${{ github.event.inputs.COMMON_TREE_URL }} \
+            -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} \
+            ./${{ github.event.inputs.COMMON_PATH }}
 
-    - name: 克隆通用树
-      if: |
-        github.event.inputs.COMMON_TREE_URL != '' &&
-        github.event.inputs.COMMON_PATH != ''
-      run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}
-        git clone \
-          ${{ github.event.inputs.COMMON_TREE_URL }} \
-          -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} \
-          ./${{ github.event.inputs.COMMON_PATH }}
+      - name: 同步设备依赖
+        run: |
+          cd ${{ steps.pwd.outputs.workspace-folder }}
+          DEP_FILE="${{ github.event.inputs.DEVICE_PATH }}/twrp.dependencies"
+          if [ -f "$DEP_FILE" ]; then
+            echo "Found $DEP_FILE"
+            bash ${GITHUB_WORKSPACE}/scripts/convert.sh "$DEP_FILE"
+            repo sync -j$(nproc --all)
+          else
+            echo "No dependency file, skip."
+          fi
 
-    - name: 同步设备依赖
-      run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}
-        DEP_FILE="${{ github.event.inputs.DEVICE_PATH }}/twrp.dependencies"
-        if [ -f "$DEP_FILE" ]; then
-          echo "Found $DEP_FILE"
-          bash ${GITHUB_WORKSPACE}/scripts/convert.sh "$DEP_FILE"
-          repo sync -j$(nproc --all)
-        else
-          echo "No dependency file, skip."
-        fi
+      - name: 设置交换空间
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
 
-    - name: 设置交换空间
-      uses: pierotofy/set-swap-space@master
-      with:
-        swap-size-gb: 12
+      - name: 设置 ccache
+        uses: actions/cache@v6
+        with:
+          path: ~/.ccache
+          key: ccache-fox-${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.FOX_BRANCH }}
+          restore-keys: |
+            ccache-fox-${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.FOX_BRANCH }}-
 
-    - name: 设置 ccache
-      uses: actions/cache@v6
-      with:
-        path: ~/.ccache
-        key: ccache-fox-${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.FOX_BRANCH }}
-        restore-keys: |
-          ccache-fox-${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.FOX_BRANCH }}-
+      - name: Debug SSH
+        if: ${{ github.event.inputs.ENABLE_SSH == 'true' }}
+        uses: mxschmitt/action-tmate@v3
 
-    - name: Debug SSH
-      if: ${{ github.event.inputs.ENABLE_SSH == 'true' }}
-      uses: mxschmitt/action-tmate@v3
+      - name: 构建 OrangeFox recovery
+        run: |
+          set +e
+          export USE_CCACHE=1
+          export CCACHE_EXEC=$(which ccache)
+          export CCACHE_DIR=~/.ccache
+          export LC_ALL=C
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export FOX_BUILD_DEVICE=${{ github.event.inputs.DEVICE_NAME }}
+          export FOX_AB_DEVICE=1
+          export FOX_VIRTUAL_AB_DEVICE=1
 
-    - name: 构建 OrangeFox recovery
-      run: |
-        set +e
-        export USE_CCACHE=1
-        export CCACHE_EXEC=$(which ccache)
-        export CCACHE_DIR=~/.ccache
-        export LC_ALL=C
-        export ALLOW_MISSING_DEPENDENCIES=true
-        export FOX_BUILD_DEVICE=${{ github.event.inputs.DEVICE_NAME }}
-        export FOX_AB_DEVICE=1
-        export FOX_VIRTUAL_AB_DEVICE=1
+          ccache -M 10G
+          ccache -s
 
-        ccache -M 10G
-        ccache -s
+          source build/envsetup.sh
+          lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
 
-        source build/envsetup.sh
-        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
+          echo "===== BUILD VAR ====="
+          get_build_var PRODUCT_OUT
+          get_build_var BOARD_USES_RECOVERY_AS_BOOT || true
+          get_build_var BOARD_USES_VENDOR_BOOT || true
+          get_build_var BOARD_BOOT_HEADER_VERSION
+          get_build_var BOARD_VENDOR_BOOTIMAGE_PARTITION_SIZE
+          get_build_var BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT
+          get_build_var BOARD_INCLUDE_RECOVERY_RAMDISK_IN_VENDOR_BOOT
+          get_build_var TARGET_NO_KERNEL || true
+          get_build_var FOX_VENDOR_BOOT_RECOVERY || true
+          get_build_var INSTALLED_VENDOR_BOOTIMAGE_TARGET || true
+          echo "===================="
 
-        echo "===== BUILD VAR ====="
-        get_build_var PRODUCT_OUT
-        get_build_var BOARD_USES_RECOVERY_AS_BOOT || true
-        get_build_var BOARD_USES_VENDOR_BOOT || true
-        get_build_var BOARD_BOOT_HEADER_VERSION
-        get_build_var BOARD_VENDOR_BOOTIMAGE_PARTITION_SIZE
-        get_build_var BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT
-        get_build_var BOARD_INCLUDE_RECOVERY_RAMDISK_IN_VENDOR_BOOT
-        get_build_var TARGET_NO_KERNEL || true
-        get_build_var FOX_VENDOR_BOOT_RECOVERY || true
-        get_build_var INSTALLED_VENDOR_BOOTIMAGE_TARGET || true
-        echo "===================="
+          mka adbd ${{ github.event.inputs.BUILD_TARGET }} \
+            -j$(nproc --all)
 
-        mka adbd ${{ github.event.inputs.BUILD_TARGET }} \
-          -j$(nproc --all)
+          echo
+          echo "========== OUTPUT =========="
+          find out/target/product/${{ github.event.inputs.DEVICE_NAME }} -maxdepth 1 -type f
+          ls -lh out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img || true
+          ls -lh out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz || true
+          echo "============================"
 
-        echo
-        echo "========== OUTPUT =========="
-        find out/target/product/${{ github.event.inputs.DEVICE_NAME }} -maxdepth 1 -type f
-        ls -lh out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img || true
-        ls -lh out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz || true
-        echo "============================"
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
-      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
-
-    - name: 上传到 Release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-         workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
-         workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
-         workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz
-        fail_on_unmatched_files: false
-        overwrite_files: true
-        name: OrangeFox-R12.1-${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
-        tag_name: ${{ github.run_id }}
-        body: |
-          OrangeFox 分支: ${{ github.event.inputs.FOX_BRANCH }}
-          设备: ${{ github.event.inputs.DEVICE_NAME }}
-          构建目标: ${{ github.event.inputs.BUILD_TARGET }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
+            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
+            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz
+          fail_on_unmatched_files: false
+          overwrite_files: true
+          name: OrangeFox-R12.1-${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
+          tag_name: ${{ github.run_id }}
+          body: |
+            OrangeFox 分支: ${{ github.event.inputs.FOX_BRANCH }}
+            设备: ${{ github.event.inputs.DEVICE_NAME }}
+            构建目标: ${{ github.event.inputs.BUILD_TARGET }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

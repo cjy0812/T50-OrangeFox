@@ -1,0 +1,4 @@
+#!/bin/sh
+dir="$(cd "$(dirname "$0")" && pwd)"
+pwsh -NoProfile -ExecutionPolicy Bypass -File "$dir/pre-push.ps1"
+exit $?
