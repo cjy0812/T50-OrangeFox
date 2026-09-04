@@ -143,11 +143,22 @@ jobs:
             packagekit
             modemmanager
           )
-          sudo apt-mark hold "${HOLD_PKGS[@]}"
+          INSTALLED=()
+          for pkg in "${HOLD_PKGS[@]}"; do
+            if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "installed"; then
+              INSTALLED+=("$pkg")
+            fi
+          done
+          if [ ${#INSTALLED[@]} -gt 0 ]; then
+            echo "Hold: ${INSTALLED[*]}"
+            sudo apt-mark hold "${INSTALLED[@]}"
+          fi
           UPGRADES=$(apt list --upgradable 2>/dev/null | grep -v '^Listing' | wc -l)
-          echo "::notice::升级 $UPGRADES 个包（已排除无用服务包）"
+          echo "::notice::升级 $UPGRADES 个包（已排除 ${#INSTALLED[@]} 个无用服务包）"
           sudo apt upgrade -yq
-          sudo apt-mark unhold "${HOLD_PKGS[@]}"
+          if [ ${#INSTALLED[@]} -gt 0 ]; then
+            sudo apt-mark unhold "${INSTALLED[@]}"
+          fi
 
       - name: 准备环境（动态内核模块）
         run: |
