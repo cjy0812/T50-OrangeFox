@@ -55,6 +55,13 @@ on:
         description: "构建模式 (debug: 产物放artifacts / release: 可刷入镜像上传Release)"
         required: true
         default: "release"
+        type: choice
+        options:
+          - debug
+          - release
+
+  schedule:
+    - cron: "0 4 */14 * *"
 
 jobs:
   build:
@@ -66,9 +73,21 @@ jobs:
       contents: write
 
     steps:
+      - name: 判断构建模式 (schedule 默认 release)
+        id: detect-mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "mode=release" >> $GITHUB_OUTPUT
+            echo "::notice::Schedule trigger: using release mode"
+          else
+            echo "mode=${{ github.event.inputs.BUILD_MODE }}" >> $GITHUB_OUTPUT
+            echo "::notice::Manual trigger: mode=${{ github.event.inputs.BUILD_MODE }}"
+          fi
+
       - name: 显示运行参数
         run: |
           echo "::group::用户环境变量"
+          echo "触发方式: ${{ github.event_name }}"
           echo "OrangeFox 分支: ${{ github.event.inputs.FOX_BRANCH }}"
           echo "设备树 URL: ${{ github.event.inputs.DEVICE_TREE_URL }}"
           echo "设备树分支: ${{ github.event.inputs.DEVICE_TREE_BRANCH }}"
@@ -76,7 +95,7 @@ jobs:
           echo "设备名称: ${{ github.event.inputs.DEVICE_NAME }}"
           echo "Makefile 名称: ${{ github.event.inputs.MAKEFILE_NAME }}"
           echo "构建目标: ${{ github.event.inputs.BUILD_TARGET }}"
-          echo "构建模式: ${{ github.event.inputs.BUILD_MODE }}"
+          echo "构建模式: ${{ steps.detect-mode.outputs.mode }}"
           echo "::endgroup::"
 
       - name: 清理磁盘空间
@@ -367,6 +386,64 @@ jobs:
 
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
+      - name: Bump version (release模式)
+        if: steps.detect-mode.outputs.mode == 'release'
+        id: tag_version
+        uses: anothrNick/github-tag-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag_prefix: "v"
+          default_bump: "patch"
+          initial_version: "1.0.0"
+
+      - name: 生成发布名称与整理产物
+        id: release-info
+        run: |
+          BRANCH="${{ github.event.inputs.FOX_BRANCH }}"
+          DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
+          MODE="${{ steps.detect-mode.outputs.mode }}"
+          SHORT_HASH=$(git rev-parse --short=7 HEAD)
+
+          if [ "$MODE" = "release" ]; then
+            TAG="${{ steps.tag_version.outputs.new_tag }}"
+            PART="${{ steps.tag_version.outputs.part }}"
+            echo "::notice::Version bumped: $PART → $TAG"
+          else
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            TAG="${LATEST_TAG}-${SHORT_HASH}"
+            echo "::notice::Debug mode: based on $LATEST_TAG"
+          fi
+
+          NAME="OrangeFox_R${BRANCH}_${DEVICE}_${TAG}"
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "short_hash=$SHORT_HASH" >> $GITHUB_OUTPUT
+
+          echo "::notice::Final tag: $TAG"
+          echo "::notice::Release name: $NAME"
+
+          DEVICE_OUT="out/target/product/${{ github.event.inputs.DEVICE_NAME }}"
+          STAGING="/tmp/upload-staging"
+          rm -rf "$STAGING"
+          mkdir -p "$STAGING/obj/PACKAGING/vendor_ramdisk_fragments_intermediates"
+
+          VER_TAG="v${{ steps.tag_version.outputs.new_tag }}-${SHORT_HASH}"
+          if [ "$MODE" != "release" ]; then
+            VER_TAG="$TAG"
+          fi
+
+          cp "$DEVICE_OUT"/vendor_boot.img "$STAGING/vendor_boot_${VER_TAG}.img" 2>/dev/null || true
+          cp "$DEVICE_OUT"/ramdisk.img "$STAGING/" 2>/dev/null || true
+          cp "$DEVICE_OUT"/OrangeFox-*.zip "$STAGING/" 2>/dev/null || true
+          cp "$DEVICE_OUT"/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz \
+             "$STAGING/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/" 2>/dev/null || true
+
+          echo "=== Staged files ==="
+          ls -lhR "$STAGING"
+          echo "===================="
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
       - name: 保存 ccache
         if: always()
         uses: actions/cache/save@v6
@@ -374,36 +451,45 @@ jobs:
           path: ~/.ccache
           key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
 
-      - name: 上传到 Release
-        if: github.event.inputs.BUILD_MODE == 'release'
+      - name: 上传到 Release (两个img)
+        if: steps.detect-mode.outputs.mode == 'release'
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
+            /tmp/upload-staging/vendor_boot_*.img
+            /tmp/upload-staging/ramdisk.img
           fail_on_unmatched_files: false
           overwrite_files: true
-          name: OrangeFox-R12.1-${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
-          tag_name: ${{ github.run_id }}
+          name: ${{ steps.release-info.outputs.name }}
+          tag_name: ${{ steps.release-info.outputs.tag }}
           body: |
-            OrangeFox 分支: ${{ github.event.inputs.FOX_BRANCH }}
-            设备: ${{ github.event.inputs.DEVICE_NAME }}
-            构建目标: ${{ github.event.inputs.BUILD_TARGET }}
-            构建模式: ${{ github.event.inputs.BUILD_MODE }}
+            OrangeFox Branch: ${{ github.event.inputs.FOX_BRANCH }}
+            Device: ${{ github.event.inputs.DEVICE_NAME }}
+            Build Target: ${{ github.event.inputs.BUILD_TARGET }}
+            Version: ${{ steps.release-info.outputs.tag }}
 
-            刷机命令: fastboot flash vendor_boot vendor_boot.img
+            Flash Commands:
+            - `fastboot flash vendor_boot vendor_boot_*.img` (主镜像, 必刷)
+            - `fastboot flash ramdisk ramdisk.img` (备用, 可选)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 上传产物到 Artifacts
-        if: always()
+      - name: 上传辅助产物到 Artifacts (release模式)
+        if: steps.detect-mode.outputs.mode == 'release'
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ github.event.inputs.BUILD_MODE }}-build-${{ github.run_id }}
+          name: release-aux-${{ steps.release-info.outputs.tag }}
           path: |
-            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
-            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
-            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz
-            !workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/OrangeFox-*/**
-          if-no-files-found: warn
-          retention-days: ${{ github.event.inputs.BUILD_MODE == 'debug' && 14 || 90 }}
+            /tmp/upload-staging/OrangeFox-*.zip
+            /tmp/upload-staging/obj/**
+          retention-days: 90
+          compression-level: 9
+
+      - name: 上传全部产物到 Artifacts (debug模式)
+        if: steps.detect-mode.outputs.mode == 'debug'
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-build-${{ steps.release-info.outputs.tag }}
+          path: /tmp/upload-staging/**
+          retention-days: 14
           compression-level: 9
