@@ -118,11 +118,21 @@ jobs:
           WRAPPER_DIR="$HOME/.local/orangefox-ci-bin"
           mkdir -p "$WRAPPER_DIR"
 
+          REAL_REPO="$(which repo)"
           REAL_GIT="$(which git)"
+
+          echo "REAL_REPO=$REAL_REPO"
           echo "REAL_GIT=$REAL_GIT"
 
-          # --- git wrapper (shallow clone only) ---
-          # NOTE: repo wrapper removed — newer repo versions don't support --depth on sync
+          # --- repo wrapper (仅转发，不注入 --depth) ---
+          # repo sync 不支持 --depth 参数
+          # 浅克隆由 repo init --depth=1 控制（上游脚本已有）
+          cat > "$WRAPPER_DIR/repo" << 'REPOEOF'
+          #!/bin/bash
+          exec "__REAL_REPO__" "$@"
+          REPOEOF
+
+          # --- git wrapper ---
           cat > "$WRAPPER_DIR/git" << 'GITEOF'
           #!/bin/bash
           REAL_GIT="__REAL_GIT__"
@@ -140,8 +150,9 @@ jobs:
           exec "$REAL_GIT" "$@"
           GITEOF
 
+          sed -i "s|__REAL_REPO__|$REAL_REPO|" "$WRAPPER_DIR/repo"
           sed -i "s|__REAL_GIT__|$REAL_GIT|" "$WRAPPER_DIR/git"
-          chmod +x "$WRAPPER_DIR/git"
+          chmod +x "$WRAPPER_DIR/repo" "$WRAPPER_DIR/git"
 
           echo "$WRAPPER_DIR" >> $GITHUB_PATH
 
