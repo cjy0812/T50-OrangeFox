@@ -388,6 +388,48 @@ jobs:
 
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
+      - name: Repack vendor_boot (MTK fix)
+        id: repack
+        run: |
+          DEVICE_OUT="out/target/product/${{ github.event.inputs.DEVICE_NAME }}"
+          FOX_VB="$DEVICE_OUT/vendor_boot.img"
+          STOCK_VB="${{ github.event.inputs.DEVICE_PATH }}/Raw_img/vendor_boot_a.bin"
+          REPACK_SCRIPT="repack_vendor_boot.py"
+
+          if [ ! -f "$FOX_VB" ]; then
+            echo "SKIP: vendor_boot.img not found"
+            echo "needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ ! -f "$STOCK_VB" ]; then
+            echo "WARN: stock vendor_boot_a.bin not found, skip repack"
+            echo "needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ ! -f "$REPACK_SCRIPT" ]; then
+            echo "WARN: repack_vendor_boot.py not found, skip repack"
+            echo "needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "=== Repacking vendor_boot ==="
+          echo "  Stock: $STOCK_VB ($(stat -c%s "$STOCK_VB") bytes)"
+          echo "  Fox:   $FOX_VB ($(stat -c%s "$FOX_VB") bytes)"
+
+          python3 "$REPACK_SCRIPT" "$STOCK_VB" "$FOX_VB" "$DEVICE_OUT/vendor_boot_repacked.img"
+
+          if [ -f "$DEVICE_OUT/vendor_boot_repacked.img" ]; then
+            mv "$DEVICE_OUT/vendor_boot_repacked.img" "$FOX_VB"
+            echo "Repacked vendor_boot.img replaces original"
+            echo "needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "ERROR: repack failed, keeping original"
+            echo "needed=false" >> $GITHUB_OUTPUT
+          fi
+        working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
       - name: Bump version (release模式)
         if: steps.detect-mode.outputs.mode == 'release'
         id: tag_version
@@ -472,9 +514,11 @@ jobs:
             Device: ${{ github.event.inputs.DEVICE_NAME }}
             Build Target: ${{ github.event.inputs.BUILD_TARGET }}
             Version: ${{ steps.release-info.outputs.tag }}
+            MTK Repack: ${{ steps.repack.outputs.needed }}
 
+            ⚠️ MediaTek devices: vendor_boot has been repacked (stock PLATFORM + Fox RECOVERY merged)
             Flash Commands:
-            - `fastboot flash vendor_boot vendor_boot_*.img` (主镜像, 必刷)
+            - `fastboot flash vendor_boot_a vendor_boot_*.img` (MTK A/B, 必刷)
             - `fastboot flash ramdisk ramdisk.img` (备用, 可选)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
