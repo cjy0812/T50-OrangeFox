@@ -154,6 +154,14 @@ jobs:
             sudo apt-mark unhold "${HELD[@]}"
           fi
 
+      - name: 验证构建工具可用性
+        run: |
+          if ! command -v ccache &>/dev/null; then
+            echo "::warning::ccache not found, reinstalling..."
+            sudo apt-get install -yq ccache
+          fi
+          ccache --version
+
       - name: 准备环境（动态内核模块）
         run: |
           DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
@@ -376,7 +384,7 @@ jobs:
 
       - name: 上传产物到 Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ github.event.inputs.BUILD_MODE }}-build-${{ github.run_id }}
           path: |
