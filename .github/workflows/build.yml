@@ -79,26 +79,33 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v7
 
-      - name: 准备环境
+      - name: 准备环境（缓存 apt 包）
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: >-
+            gperf gcc-multilib gcc-10-multilib
+            g++-multilib g++-10-multilib
+            libc6-dev lib32ncurses-dev
+            x11proto-core-dev libx11-dev tree
+            lib32z-dev libgl1-mesa-dev libxml2-utils
+            xsltproc bc ccache
+            lib32readline-dev lib32z1-dev
+            liblz4-tool libncurses-dev
+            libsdl1.2-dev build-essential
+            libgtk-3-dev libglu1-mesa-dev
+            freeglut3-dev git libxml2 lzop
+            pngcrush schedtool squashfs-tools
+            imagemagick libbz2-dev lzma
+            ncftp qemu-user-static
+            libstdc++-10-dev libncurses6
+            python3 tar
+          version: 1.0
+          execute_install_scripts: false
+
+      - name: 准备环境（动态内核模块）
         run: |
           DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
-            linux-modules-extra-$(uname -r) \
-            gperf gcc-multilib gcc-10-multilib \
-            g++-multilib g++-10-multilib \
-            libc6-dev lib32ncurses-dev \
-            x11proto-core-dev libx11-dev tree \
-            lib32z-dev libgl1-mesa-dev libxml2-utils \
-            xsltproc bc ccache \
-            lib32readline-dev lib32z1-dev \
-            liblz4-tool libncurses-dev \
-            libsdl1.2-dev build-essential \
-            libgtk-3-dev libglu1-mesa-dev \
-            freeglut3-dev git libxml2 lzop \
-            pngcrush schedtool squashfs-tools \
-            imagemagick libbz2-dev lzma \
-            ncftp qemu-user-static \
-            libstdc++-10-dev libncurses6 \
-            python3 tar
+            linux-modules-extra-$(uname -r)
 
       - name: 安装 OpenJDK
         uses: actions/setup-java@v6
@@ -113,26 +120,14 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      - name: 安装浅克隆 wrappers
+      - name: 安装浅克隆 git wrapper
         run: |
           WRAPPER_DIR="$HOME/.local/orangefox-ci-bin"
           mkdir -p "$WRAPPER_DIR"
 
-          REAL_REPO="$(which repo)"
           REAL_GIT="$(which git)"
-
-          echo "REAL_REPO=$REAL_REPO"
           echo "REAL_GIT=$REAL_GIT"
 
-          # --- repo wrapper (仅转发，不注入 --depth) ---
-          # repo sync 不支持 --depth 参数
-          # 浅克隆由 repo init --depth=1 控制（上游脚本已有）
-          cat > "$WRAPPER_DIR/repo" << 'REPOEOF'
-          #!/bin/bash
-          exec "__REAL_REPO__" "$@"
-          REPOEOF
-
-          # --- git wrapper ---
           cat > "$WRAPPER_DIR/git" << 'GITEOF'
           #!/bin/bash
           REAL_GIT="__REAL_GIT__"
@@ -150,14 +145,13 @@ jobs:
           exec "$REAL_GIT" "$@"
           GITEOF
 
-          sed -i "s|__REAL_REPO__|$REAL_REPO|" "$WRAPPER_DIR/repo"
           sed -i "s|__REAL_GIT__|$REAL_GIT|" "$WRAPPER_DIR/git"
-          chmod +x "$WRAPPER_DIR/repo" "$WRAPPER_DIR/git"
+          chmod +x "$WRAPPER_DIR/git"
 
           echo "$WRAPPER_DIR" >> $GITHUB_PATH
 
-          echo "Wrappers installed:"
-          ls -la "$WRAPPER_DIR/"
+          echo "git wrapper installed:"
+          ls -la "$WRAPPER_DIR/git"
 
       - name: 初始化工作目录
         run: |
@@ -264,11 +258,11 @@ jobs:
           export FOX_AB_DEVICE=1
           export FOX_VIRTUAL_AB_DEVICE=1
 
-          ccache -M 10G
+          ccache -M 5G
           ccache -s
 
-          source build/envsetup.sh
-          lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
+          source build/envsetup.sh || { echo "ERROR: envsetup.sh failed"; exit 1; }
+          lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng || { echo "ERROR: lunch failed"; exit 1; }
 
           echo "===== BUILD VAR ====="
           get_build_var PRODUCT_OUT
