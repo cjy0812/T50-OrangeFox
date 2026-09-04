@@ -118,6 +118,8 @@ jobs:
 
       - name: 检出代码
         uses: actions/checkout@v7
+        with:
+          fetch-depth: "0"
 
       - name: 准备缓存键
         id: cache-key
@@ -464,6 +466,7 @@ jobs:
           overwrite_files: true
           name: ${{ steps.release-info.outputs.name }}
           tag_name: ${{ steps.release-info.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           body: |
             OrangeFox Branch: ${{ github.event.inputs.FOX_BRANCH }}
             Device: ${{ github.event.inputs.DEVICE_NAME }}
