@@ -1,5 +1,16 @@
+# Build artifacts
 *.txt
+ci_artifacts/
 release_output/
 stock_images/
+
+# Python cache
+__pycache__/
 .mypy_cache/
+
+# Trae IDE local copy (synced from .claude/skills/ via git hooks)
 .trae/
+
+# IDE
+.vscode/
+.idea/
