@@ -358,6 +358,13 @@ jobs:
 
           echo "SUCCESS: $IMG_COUNT image(s) produced"
 
+          DEVICE_OUT="out/target/product/${{ github.event.inputs.DEVICE_NAME }}"
+          FOX_IMG=$(ls "$DEVICE_OUT"/OrangeFox-*.img 2>/dev/null | head -1)
+          if [ -n "$FOX_IMG" ] && [ -f "$DEVICE_OUT/vendor_boot.img" ]; then
+            rm "$FOX_IMG"
+            echo "Removed duplicate $(basename "$FOX_IMG") (identical to vendor_boot.img)"
+          fi
+
         working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
       - name: 保存 ccache
@@ -382,6 +389,8 @@ jobs:
             设备: ${{ github.event.inputs.DEVICE_NAME }}
             构建目标: ${{ github.event.inputs.BUILD_TARGET }}
             构建模式: ${{ github.event.inputs.BUILD_MODE }}
+
+            刷机命令: fastboot flash vendor_boot vendor_boot.img
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -394,5 +403,7 @@ jobs:
             workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
             workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
             workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz
+            !workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/OrangeFox-*/**
           if-no-files-found: warn
           retention-days: ${{ github.event.inputs.BUILD_MODE == 'debug' && 14 || 90 }}
+          compression-level: 9
