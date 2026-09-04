@@ -272,8 +272,16 @@ jobs:
           ccache -M 5G
           ccache -s
 
-          source build/envsetup.sh || { echo "ERROR: envsetup.sh failed"; exit 1; }
-          lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng || { echo "ERROR: lunch failed"; exit 1; }
+          echo "=== Debug: BoardConfig.mk TW_THEME ==="
+          grep -E "TW_THEME|TW_ROTATION|TARGET_SCREEN" ${{ github.event.inputs.DEVICE_PATH }}/BoardConfig.mk || true
+          echo "=== Debug: Available themes ==="
+          find bootable/recovery/gui/theme -maxdepth 1 -type d 2>/dev/null || echo "No theme dir found"
+          echo "=== Debug: orangefox.mk TW_ROTATION check ==="
+          grep -n "TW_ROTATION" vendor/twrp/orangefox.mk 2>/dev/null || echo "No TW_ROTATION in orangefox.mk"
+          grep -n "TW_ROTATION" bootable/recovery/minuitwrp/Android.mk 2>/dev/null || echo "No TW_ROTATION in minuitwrp/Android.mk"
+
+          source build/envsetup.sh 2>&1 || { echo "ERROR: envsetup.sh failed with exit code $?"; exit 1; }
+          lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng 2>&1 || { echo "ERROR: lunch failed with exit code $?"; exit 1; }
 
           echo "===== BUILD VAR ====="
           get_build_var PRODUCT_OUT
