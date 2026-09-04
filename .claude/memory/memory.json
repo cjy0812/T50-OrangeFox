@@ -1,0 +1,450 @@
+{
+    "type": "entity",
+    "name": "default_user",
+    "entityType": "user",
+    "observations": [
+        "GitHub: cjy0812",
+        "拥有台电T50平板 (MT8786/MT6768, codename: tb8786p1_64_k510_wifi)",
+        "目标: 构建OrangeFox R12.1 Recovery",
+        "GitHub email: cjy081219@Gmail.com"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Device",
+    "entityType": "userRequirements",
+    "observations": [
+        "SoC: MediaTek MT8786 (MT6768) Helio G80, 8核",
+        "codename: tb8786p1_64_k510_wifi",
+        "架构: Virtual A/B, Dynamic Partitions",
+        "boot header version: 4, kernel pagesize: 4096",
+        "kernel base: 0x40078000, kernel offset: 0x00008000",
+        "ramdisk offset: 0x07c08000, tags/dtb offset: 0x07c08000",
+        "cmdline: bootopt=64S3,32N2,64N2 androidboot.selinux=permissive",
+        "vendor_boot不含kernel → TARGET_NO_KERNEL=true"
+    ]
+}
+{
+    "type": "entity",
+    "name": "BoardConfig_Key_Vars",
+    "entityType": "codeSnippet",
+    "observations": [
+        "FOX_VENDOR_BOOT_RECOVERY := 1",
+        "TARGET_NO_KERNEL := true, TARGET_NO_RECOVERY := true",
+        "BOARD_BOOT_HEADER_VERSION := 4, BOARD_KERNEL_PAGESIZE := 4096",
+        "BOARD_KERNEL_BASE := 0x40078000",
+        "BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT := true",
+        "BOARD_INCLUDE_RECOVERY_RAMDISK_IN_VENDOR_BOOT := true",
+        "BOARD_KERNEL_SEPARATED_DTBO := true",
+        "TARGET_PREBUILT_DTB := $(DEVICE_PATH)/prebuilt/dtb.img",
+        "ALLOW_MISSING_DEPENDENCIES := true",
+        "BOARD_VENDOR_CMDLINE := bootopt=64S3,32N2,64N2 androidboot.selinux=permissive",
+        "AB_OTA_UPDATER := true",
+        "BOARD_BOOTIMAGE_PARTITION_SIZE := 33554432 (32MiB)",
+        "BOARD_VENDOR_BOOTIMAGE_PARTITION_SIZE := 67108864 (64MiB)",
+        "TW_THEME := portrait_hdpi, TW_ROTATION := 270",
+        "TW_BRIGHTNESS_PATH := /sys/class/leds/lcd-backlight/brightness",
+        "TW_MAX_BRIGHTNESS := 255, TW_DEFAULT_BRIGHTNESS := 128"
+    ]
+}
+{
+    "type": "entity",
+    "name": "CI_Workflow",
+    "entityType": "codeSnippet",
+    "observations": [
+        "源码同步: orangefox_sync.sh --branch 12.1",
+        "构建命令: mka adbd vendorbootimage",
+        "lunch目标: twrp_tb8786p1_64_k510_wifi-eng",
+        "envsetup.sh需workaround: || true + type -t lunch验证 (OrangeFox orangefox_envsetup返回码bug)",
+        "设备树仓库: cjy0812/T50_OrangeFox_Device_Tree (public)",
+        "CI仓库: cjy0812/T50-OrangeFox (public)",
+        "浅克隆: git wrapper注入--depth=1, repo init已在上游脚本中"
+    ]
+}
+{
+    "type": "entity",
+    "name": "Confirmed_Conclusions",
+    "entityType": "confirmationPoint",
+    "observations": [
+        "vendor_boot不含kernel → TARGET_NO_KERNEL=true",
+        "OrangeFox使用twrp_前缀 → omni_改为twrp_",
+        "add_lunch_combo在AOSP 12.1已obsolete → 使用COMMON_LUNCH_CHOICES",
+        "设备树文件必须在仓库根目录",
+        "MTK非标准vendor_boot头部: tags_addr存储vendor_ramdisk_size",
+        "PRODUCT_STATIC_BOOT_CONTROL_HAL在AOSP12.1已obsolete → 移除",
+        "OrangeFox R12.1只有portrait_hdpi和watch_mdpi主题, landscape_hdpi不存在",
+        "TW_THEME=portrait_hdpi + TW_ROTATION=270 实现横屏显示",
+        "OrangeFox orangefox_envsetup()最后一行条件检查返回1是假阳性, 需||true + 验证lunch存在",
+        "构建成功产物: OrangeFox-R12.0-Unofficial-tb8786p1.img(64MB) + vendor_boot.img(64MB) + ramdisk.img(1.3MB)",
+        "CI构建警告BOARD_PLAT_*_SEPOLICY_DIR deprecated是AOSP源码问题, 无法从Device_Tree修复, 可忽略",
+        "CI构建警告FOX_VENDOR_BOOT_RECOVERY experimental是必需配置, 不能移除"
+    ]
+}
+{
+    "type": "entity",
+    "name": "Project_Constraints",
+    "entityType": "rejectionRecord",
+    "observations": [
+        "不刷机",
+        "不修改LK",
+        "不猜测未知参数",
+        "不要重新分析已确认参数 直接进入构建结果分析"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Project_Knowledge_Base",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== T50 OrangeFox Recovery 项目知识库 ===",
+        "更新日期: 2026-09-04",
+        "项目仓库: cjy0812/T50-OrangeFox (主仓库, 含CI)",
+        "设备树仓库: cjy0812/T50_OrangeFox_Device_Tree (submodule)",
+        "OrangeFox版本: R12.1 (AOSP 12.1基础)",
+        "目标设备: 台电T50 平板 (Teclast T50)",
+        "最新CI构建: Run 33878074755 SUCCESS (11:13)",
+        "构建状态: ✅ 成功, 产物已生成"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Hardware_Profile",
+    "entityType": "userRequirements",
+    "observations": [
+        "=== T50 硬件档案 ===",
+        "SoC: MediaTek MT8786 (即MT6768, Helio G80)",
+        "CPU: 8核 (2x Cortex-A75 @2.0GHz + 6x Cortex-A55 @1.8GHz)",
+        "GPU: Mali-G52 MC2",
+        "屏幕: 2400x1600 IPS 横屏平板",
+        "Android版本: 12 (SP1A.210812.016)",
+        "构建类型: userdebug (ro.debuggable=1)",
+        "架构: Virtual A/B + Dynamic Partitions",
+        "Boot: header v4, pagesize 4096",
+        "分区: boot_a/b, vendor_boot_a/b (64MB), init_boot_a/b, dtbo_a/b, vbmeta*, system, vendor, product, system_ext",
+        "USB控制器: musb-hdrc (MediaTek USB OTG)",
+        "亮度路径: /sys/class/leds/lcd-backlight/brightness"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Boot_Chain_Architecture",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== T50 启动链架构 ===",
+        "1. preloader → lk (Little Kernel) → kernel",
+        "2. boot_a: 含kernel + generic ramdisk (header v4)",
+        "3. vendor_boot_a: 含vendor ramdisk (PLATFORM fragment) + DTB (header v4)",
+        "4. init_boot_a: 全零 (T50不使用GKI init_boot)",
+        "5. 关键: vendor_boot不含kernel → TARGET_NO_KERNEL=true",
+        "6. 关键: vendor_boot使用FOX_VENDOR_BOOT_RECOVERY模式",
+        "7. MediaTek bootloader仅加载PLATFORM fragment, 不加载RECOVERY fragment",
+        "8. DTB通过BOARD_MKBOOTIMG_ARGS --dtb传入"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_VendorBoot_Header_Structure",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== vendor_boot v4 Header 结构 (MediaTek定制) ===",
+        "magic: VNDRBOOT, header_version: 4, page_size: 4096",
+        "kernel_addr: 0x40080000, ramdisk_addr: 0x47c80000",
+        "tags_addr: 0x4bc80000, dtb_addr: 0x4bc80000",
+        "cmdline: bootopt=64S3,32N2,64N2 androidboot.selinux=permissive",
+        "header_size: 2128, dtb_size: 159622 bytes",
+        "MTK非标准: cmdline总大小2024 bytes (非AOSP标准4096)",
+        "MTK非标准: tags_addr字段存储vendor_ramdisk_size",
+        "Stock镜像: 1个PLATFORM fragment (20.9MB), 0个RECOVERY fragment"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_BoardConfig_Critical_Config",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== BoardConfig.mk 关键配置 (当前) ===",
+        "TARGET_ARCH := arm64, TARGET_BOARD_PLATFORM := mt6768",
+        "AB_OTA_UPDATER := true",
+        "TARGET_NO_KERNEL := true, TARGET_NO_RECOVERY := true",
+        "BOARD_USES_GENERIC_KERNEL_IMAGE := true",
+        "BOARD_BOOT_HEADER_VERSION := 4, BOARD_KERNEL_PAGESIZE := 4096",
+        "FOX_VENDOR_BOOT_RECOVERY := 1",
+        "BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT := true",
+        "BOARD_INCLUDE_RECOVERY_RAMDISK_IN_VENDOR_BOOT := true",
+        "TW_THEME := portrait_hdpi (OrangeFox R12.1无landscape_hdpi)",
+        "TW_ROTATION := 270 (横屏显示)",
+        "TW_BRIGHTNESS_PATH := /sys/class/leds/lcd-backlight/brightness",
+        "TW_MAX_BRIGHTNESS := 255, TW_DEFAULT_BRIGHTNESS := 128"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Bootloop_RootCause_And_Solution",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== Bootloop 根因与解决方案 ===",
+        "根因: MediaTek bootloader仅加载vendor_boot的PLATFORM ramdisk fragment",
+        "问题: BOARD_INCLUDE_RECOVERY_RAMDISK_IN_VENDOR_BOOT:=true → AOSP创建RECOVERY fragment → PLATFORM为空 → bootloop",
+        "最终方案: 保持true + repack_vendor_boot.py后处理合并为单一PLATFORM fragment",
+        "repack逻辑: 解压stock PLATFORM + 解压OrangeFox RECOVERY → 合并 → 重打包",
+        "参考: unihertz-jelly-max (MT6878), klee (MT6899)"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Screen_Rotation_Fix",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== 屏幕旋转修复 ===",
+        "根因: OrangeFox R12.1不存在landscape_hdpi主题, TW_THEME=landscape_hdpi导致Theme selection failed",
+        "修复: TW_THEME=portrait_hdpi + TW_ROTATION=270",
+        "参考: GPD XD+ (MTK tablet) 使用portrait_hdpi + TW_ROTATION=270",
+        "重要: TW_ROTATION只旋转图形, 触摸需RECOVERY_TOUCHSCREEN_*单独配置",
+        "Commit: Device_Tree 3eec984"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_ADB_Fix",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== ADB不可用修复 ===",
+        "根因: init.recovery.*.rc中 on fs && property:ro.debuggable=0 → 条件永远不满足",
+        "修复: 改为 on fs (移除property条件)",
+        "原厂也有相同bug: MTK模板遗留问题"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Envsetup_Fix",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== envsetup.sh 假阳性退出码修复 ===",
+        "根因: OrangeFox orangefox_envsetup()最后一行 [ -s .../vts/Android.mk ] && echo -n '' > ...",
+        "TWRP minimal manifest中frameworks/base/.../Android.mk不存在 → [ -s ]返回1 → &&短路 → 函数返回1",
+        "source envsetup.sh继承退出码1 → CI误判失败",
+        "修复: source build/envsetup.sh 2>&1 || true + type -t lunch验证",
+        "Commit: 主仓库 84df493"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Common_Pitfalls",
+    "entityType": "rejectionRecord",
+    "observations": [
+        "=== 常见陷阱 ===",
+        "1. PRODUCT_STATIC_BOOT_CONTROL_HAL在AOSP12.1已obsolete",
+        "2. BOARD_USES_RECOVERY_AS_BOOT与BOARD_USES_GENERIC_KERNEL_IMAGE不能同时true",
+        "3. fastboot boot不适用于vendor_boot.img",
+        "4. MTK vendor_boot header非标准",
+        "5. Device_Tree是git submodule → 需分别提交",
+        "6. CI是workflow_dispatch → 需手动触发",
+        "7. TW_ROTATION只旋转图形, 触摸需单独配置",
+        "8. OrangeFox R12.1只有portrait_hdpi和watch_mdpi主题",
+        "9. envsetup.sh退出码1是假阳性, 必须||true + 验证lunch",
+        "10. BOARD_PLAT_*_SEPOLICY_DIR deprecated是AOSP源码问题, 无法从Device_Tree修复"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Reference_Devices",
+    "entityType": "confirmationPoint",
+    "observations": [
+        "=== 参考设备 ===",
+        "1. unihertz-jelly-max (MT6878): FOX_VENDOR_BOOT_RECOVERY",
+        "2. klee (MT6899): 相同vendor_boot recovery模式",
+        "3. GPD XD+ (MT8173): portrait_hdpi + TW_ROTATION=270 + touch adjustment"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_File_Structure",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== 项目文件结构 ===",
+        "主仓库: .github/workflows/build.yml, Device_Tree/(submodule), verify_fragments.py, repack_vendor_boot.py",
+        "设备树: BoardConfig.mk, device.mk, AndroidProducts.mk, prebuilt/dtb.img",
+        "设备树: recovery/root/init.recovery.mt6768.rc, init.recovery.mt8786.rc",
+        "设备树: Raw_img/vendor_boot_a.bin, boot_a.bin, init_boot_a.bin"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Flashing_Procedure",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== 刷入流程 ===",
+        "1. adb reboot bootloader → 2. fastboot devices → 3. fastboot flash vendor_boot_a vendor_boot.img → 4. fastboot reboot",
+        "注意: fastboot boot不适用, T50是Virtual A/B",
+        "回滚: fastboot flash vendor_boot_a stock_vendor_boot_a.bin"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_Stock_Ramdisk_Analysis",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== 原厂vendor_boot ramdisk分析 ===",
+        "提取: dd skip=4096 → gunzip → cpio -idm",
+        "382个文件, 含init.recovery.*.rc (与OrangeFox一致, 含相同ADB bug)",
+        "default.prop: ro.debuggable=1, persist.sys.usb.config=adb"
+    ]
+}
+{
+    "type": "entity",
+    "name": "T50_CI_Build_Workflow",
+    "entityType": "codeSnippet",
+    "observations": [
+        "=== CI构建工作流 ===",
+        "触发: workflow_dispatch (gh workflow run build.yml)",
+        "构建: mka adbd vendorbootimage -j$(nproc)",
+        "lunch: twrp_tb8786p1_64_k510_wifi-eng",
+        "产物: vendor_boot.img (~64MB), OrangeFox-R12.0-Unofficial-tb8786p1.img, ramdisk.img",
+        "最新成功构建: Run 33878074755, 耗时11:13"
+    ]
+}
+{
+    "type": "entity",
+    "name": "session_20260904_current",
+    "entityType": "session",
+    "observations": [
+        "日期: 2026-09-04",
+        "目标: 构建T50 OrangeFox Recovery",
+        "当前状态: ✅ CI构建成功 (Run 33878074755)",
+        "已修复: envsetup.sh假阳性退出码, TW_THEME=portrait_hdpi, TW_ROTATION=270",
+        "产物: OrangeFox-R12.0-Unofficial-tb8786p1.img(64MB) + vendor_boot.img(64MB) + ramdisk.img(1.3MB)",
+        "下一步: 实机验证 (刷入测试触控/显示/挂载)"
+    ]
+}
+{
+    "type": "relation",
+    "from": "default_user",
+    "to": "Confirmed_Conclusions",
+    "relationType": "CONFIRMS"
+}
+{
+    "type": "relation",
+    "from": "default_user",
+    "to": "Project_Constraints",
+    "relationType": "REJECTS"
+}
+{
+    "type": "relation",
+    "from": "T50_Device",
+    "to": "CI_Workflow",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Device",
+    "to": "BoardConfig_Key_Vars",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "session_20260904_current",
+    "to": "T50_Device",
+    "relationType": "HAS_REQUIREMENT"
+}
+{
+    "type": "relation",
+    "from": "session_20260904_current",
+    "to": "T50_Envsetup_Fix",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "session_20260904_current",
+    "to": "T50_Screen_Rotation_Fix",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Hardware_Profile",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Boot_Chain_Architecture",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_VendorBoot_Header_Structure",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_BoardConfig_Critical_Config",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Bootloop_RootCause_And_Solution",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Screen_Rotation_Fix",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_ADB_Fix",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Envsetup_Fix",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Common_Pitfalls",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Reference_Devices",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_File_Structure",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_Flashing_Procedure",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "T50_Project_Knowledge_Base",
+    "to": "T50_CI_Build_Workflow",
+    "relationType": "LINKS_TO"
+}
+{
+    "type": "relation",
+    "from": "default_user",
+    "to": "T50_Reference_Devices",
+    "relationType": "CONFIRMS"
+}
+{
+    "type": "relation",
+    "from": "default_user",
+    "to": "T50_Common_Pitfalls",
+    "relationType": "REJECTS"
+}

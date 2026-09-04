@@ -2,3 +2,5 @@
 fix_shell.py
 release_output/
 stock_images/
+.mypy_cache/
+src/
