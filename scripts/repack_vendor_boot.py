@@ -1,10 +1,10 @@
-import struct
-import sys
-import os
 import gzip
-import subprocess
-import tempfile
+import os
 import shutil
+import struct
+import subprocess
+import sys
+import tempfile
 
 
 def align4k(size):
@@ -33,7 +33,7 @@ def parse_vb_v4(path):
     if magic != b"VNDRBOOT":
         print(f"ERROR: Invalid magic {magic}, expected VNDRBOOT")
         sys.exit(1)
-    hdr_ver = struct.unpack("<I", data[O : O + 4])[0]
+    struct.unpack("<I", data[O : O + 4])[0]
     O += 4
     pg_sz = struct.unpack("<I", data[O : O + 4])[0]
     O += 4
@@ -57,7 +57,7 @@ def parse_vb_v4(path):
     O += 4
     dtb_addr = struct.unpack("<Q", data[O : O + 8])[0]
     O += 8
-    vrt_sz = struct.unpack("<I", data[O : O + 4])[0]
+    struct.unpack("<I", data[O : O + 4])[0]
     O += 4
     vrt_num = struct.unpack("<I", data[O : O + 4])[0]
     O += 4
@@ -180,24 +180,24 @@ def parse_boot_img_ramdisk(path):
         O = 8
         kernel_sz = struct.unpack("<I", data[O : O + 4])[0]
         O += 4
-        kernel_addr = struct.unpack("<I", data[O : O + 4])[0]
+        struct.unpack("<I", data[O : O + 4])[0]
         O += 4
         ramdisk_sz = struct.unpack("<I", data[O : O + 4])[0]
         O += 4
-        ramdisk_addr = struct.unpack("<I", data[O : O + 4])[0]
+        struct.unpack("<I", data[O : O + 4])[0]
         O += 4
-        second_sz = struct.unpack("<I", data[O : O + 4])[0]
+        struct.unpack("<I", data[O : O + 4])[0]
         O += 4
-        second_addr = struct.unpack("<I", data[O : O + 4])[0]
+        struct.unpack("<I", data[O : O + 4])[0]
         O += 4
-        tags_addr = struct.unpack("<I", data[O : O + 4])[0]
+        struct.unpack("<I", data[O : O + 4])[0]
         O += 4
         page_sz = struct.unpack("<I", data[O : O + 4])[0]
         O += 4
         O += 8
-        name = data[O : O + 16]
+        data[O : O + 16]
         O += 16
-        cmdline = data[O : O + 512]
+        data[O : O + 512]
         O += 512
         O += 32
         hdr_ver = struct.unpack("<I", data[O : O + 4])[0]
@@ -211,7 +211,7 @@ def parse_boot_img_ramdisk(path):
         )
         return ramdisk_data
     elif data[0:2] == b"\x1f\x8b":
-        print(f"  File is gzip compressed (likely raw ramdisk)")
+        print("  File is gzip compressed (likely raw ramdisk)")
         return data
     else:
         print(f"  Unknown format: magic={magic[:8].hex()}")
@@ -240,7 +240,7 @@ def build_vendor_boot_v4(
     hdr += name
 
     bc = bytearray()
-    hdr_with_bc = hdr + bc
+    hdr + bc
     hdr_sz_val = len(hdr)
     total_hdr_bc = hdr_sz_val + len(bc)
 
@@ -317,7 +317,7 @@ def main():
     partition_size = 67108864
 
     print(f"{'=' * 60}")
-    print(f"  Step 1: Parse stock vendor_boot")
+    print("  Step 1: Parse stock vendor_boot")
     print(f"{'=' * 60}")
     stock = parse_vb_v4(stock_path)
     for i, f in enumerate(stock["fragments"]):
@@ -339,7 +339,7 @@ def main():
     print(f"  DTB: {fmt_size(len(dtb_data))}")
 
     print(f"\n{'=' * 60}")
-    print(f"  Step 2: Parse OrangeFox vendor_boot")
+    print("  Step 2: Parse OrangeFox vendor_boot")
     print(f"{'=' * 60}")
     fox = parse_vb_v4(fox_vb_path)
     for i, f in enumerate(fox["fragments"]):
@@ -362,7 +362,7 @@ def main():
         sys.exit(1)
 
     print(f"\n{'=' * 60}")
-    print(f"  Step 3: Merge ramdisks")
+    print("  Step 3: Merge ramdisks")
     print(f"{'=' * 60}")
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -423,6 +423,88 @@ def main():
         else:
             print("  No overlay applied (stock vendor only)")
 
+        print("  Post-processing default.prop for MTK recovery...")
+        dp_path = os.path.join(merged_dir, "default.prop")
+        stock_dp_path = os.path.join(stock_dir, "default.prop")
+
+        stock_props = {}
+        if os.path.exists(stock_dp_path):
+            with open(stock_dp_path, errors="replace") as f:
+                for line in f:
+                    s = line.strip()
+                    if "=" in s and not s.startswith("#"):
+                        key = s.split("=", 1)[0]
+                        stock_props[key] = line.rstrip()
+
+        mtk_required_keys = [
+            "ro.hardware.egl",
+            "ro.hardware.hwcomposer",
+            "ro.sf.lcd_density",
+            "debug.renderengine.backend",
+            "vendor.sf.hwc_repaint_fmt",
+            "ro.surface_flinger.has_HDR_display",
+            "ro.surface_flinger.force_hwc_copy_for_virtual_displays",
+            "ro.surface_flinger.max_frame_buffer_acquired_buffers",
+        ]
+
+        if os.path.exists(dp_path):
+            with open(dp_path, errors="replace") as f:
+                dp_lines = f.readlines()
+
+            new_lines = []
+            usb_config_set = False
+            sf_orientation_set = False
+            merged_keys = set()
+            for line in dp_lines:
+                stripped = line.strip()
+                if stripped.startswith("persist.sys.usb.config=none"):
+                    continue
+                if stripped.startswith("persist.sys.usb.config=adb"):
+                    if not usb_config_set:
+                        new_lines.append(line)
+                        usb_config_set = True
+                    continue
+                if stripped.startswith(
+                    "ro.surface_flinger.primary_display_orientation="
+                ):
+                    if not sf_orientation_set:
+                        new_lines.append(
+                            "ro.surface_flinger.primary_display_orientation=ORIENTATION_270\n"
+                        )
+                        sf_orientation_set = True
+                    continue
+                if "=" in stripped and not stripped.startswith("#"):
+                    merged_keys.add(stripped.split("=", 1)[0])
+                new_lines.append(line)
+
+            if not usb_config_set:
+                new_lines.append("persist.sys.usb.config=adb\n")
+            if not sf_orientation_set:
+                new_lines.append(
+                    "ro.surface_flinger.primary_display_orientation=ORIENTATION_270\n"
+                )
+
+            missing_props = []
+            for key in mtk_required_keys:
+                if key not in merged_keys and key in stock_props:
+                    new_lines.append(stock_props[key] + "\n")
+                    missing_props.append(key)
+
+            with open(dp_path, "w") as f:
+                f.writelines(new_lines)
+
+            len(dp_lines) - len(new_lines) + len(missing_props)
+            print("    Removed persist.sys.usb.config=none lines")
+            print(
+                "    Set ro.surface_flinger.primary_display_orientation=ORIENTATION_270"
+            )
+            if missing_props:
+                print(
+                    f"    Injected {len(missing_props)} stock props: {', '.join(missing_props)}"
+                )
+        else:
+            print("    WARNING: default.prop not found in merged ramdisk")
+
         merged_cpio_path = os.path.join(tmpdir, "merged.cpio.gz")
         print("  Creating merged cpio.gz...")
         if not create_cpio_gz(merged_dir, merged_cpio_path):
@@ -433,7 +515,7 @@ def main():
             merged_ramdisk_data = f.read()
 
     print(f"\n{'=' * 60}")
-    print(f"  Step 4: Build new vendor_boot.img")
+    print("  Step 4: Build new vendor_boot.img")
     print(f"{'=' * 60}")
     print(f"  Merged PLATFORM: {fmt_size(len(merged_ramdisk_data))}")
     print(f"  DTB: {fmt_size(len(dtb_data))}")
@@ -446,7 +528,7 @@ def main():
     build_vendor_boot_v4(stock, merged_ramdisk_data, dtb_data, out_path, partition_size)
 
     print(f"\n{'=' * 60}")
-    print(f"  Step 5: Verify output")
+    print("  Step 5: Verify output")
     print(f"{'=' * 60}")
     result = parse_vb_v4(out_path)
     for i, f in enumerate(result["fragments"]):
@@ -461,13 +543,13 @@ def main():
     no_rec = not any(f["type_s"] == "RECOVERY" for f in result["fragments"])
 
     if plat_ok and no_rec:
-        print(f"\n  ✅ SUCCESS: PLATFORM fragment has content, no RECOVERY fragment")
-        print(f"  → MediaTek bootloader can load PLATFORM normally")
-        print(f"  → Recovery resources available via merged ramdisk")
+        print("\n  ✅ SUCCESS: PLATFORM fragment has content, no RECOVERY fragment")
+        print("  → MediaTek bootloader can load PLATFORM normally")
+        print("  → Recovery resources available via merged ramdisk")
     elif plat_ok:
-        print(f"\n  ⚠️  PLATFORM OK but RECOVERY fragment exists (may cause issues)")
+        print("\n  ⚠️  PLATFORM OK but RECOVERY fragment exists (may cause issues)")
     else:
-        print(f"\n  ❌ FAILED: PLATFORM fragment too small")
+        print("\n  ❌ FAILED: PLATFORM fragment too small")
 
 
 if __name__ == "__main__":

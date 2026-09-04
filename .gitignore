@@ -7,6 +7,8 @@ stock_images/
 # Python cache
 __pycache__/
 .mypy_cache/
+.ruff_cache/
+.venv/
 
 # Trae IDE local copy (synced from .claude/skills/ via git hooks)
 .trae/

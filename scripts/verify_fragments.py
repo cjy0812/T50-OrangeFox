@@ -1,6 +1,6 @@
+import os
 import struct
 import sys
-import os
 
 
 def align4k(size):
@@ -53,7 +53,7 @@ def parse_vb_v4(path):
     O += 4
     dtb_addr = struct.unpack("<Q", data[O : O + 8])[0]
     O += 8
-    vrt_sz = struct.unpack("<I", data[O : O + 4])[0]
+    struct.unpack("<I", data[O : O + 4])[0]
     O += 4
     vrt_num = struct.unpack("<I", data[O : O + 4])[0]
     O += 4
@@ -149,25 +149,25 @@ def check_bootloop_risk(info, label):
     if has_recovery:
         print(f"    WARNING: RECOVERY fragment exists ({fmt_size(recovery_size)})")
         print(
-            f"    → MediaTek bootloader may NOT load RECOVERY fragment on normal boot"
+            "    → MediaTek bootloader may NOT load RECOVERY fragment on normal boot"
         )
         if platform_size < 1024:
             print(
                 f"    CRITICAL: PLATFORM fragment is nearly empty ({fmt_size(platform_size)})"
             )
-            print(f"    → Device will bootloop! Normal boot cannot find vendor init.")
+            print("    → Device will bootloop! Normal boot cannot find vendor init.")
         else:
             print(
                 f"    CAUTION: PLATFORM fragment has content ({fmt_size(platform_size)})"
             )
-            print(f"    → May work if bootloader loads both fragments")
+            print("    → May work if bootloader loads both fragments")
     else:
-        print(f"    OK: No RECOVERY fragment (matches stock behavior)")
+        print("    OK: No RECOVERY fragment (matches stock behavior)")
         if has_platform and platform_size > 1024 * 1024:
             print(
                 f"    OK: PLATFORM fragment has substantial content ({fmt_size(platform_size)})"
             )
-            print(f"    → Device should boot normally")
+            print("    → Device should boot normally")
         elif has_platform:
             print(
                 f"    WARNING: PLATFORM fragment is small ({fmt_size(platform_size)})"

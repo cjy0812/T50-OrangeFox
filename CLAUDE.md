@@ -5,19 +5,20 @@
 ```
 T50-OrangeFox/                          # 主仓库 (submodule 容器)
 ├── .claude/                            # Claude Code 配置 (Git 权威副本)
-│   ├── memory/memory.json              # MCP 知识图谱持久化
-│   └── skills/                         # 专项 Skills (Git 追踪)
-│       ├── mcp-routing/SKILL.md        #   MCP 工具路由规则
-│       ├── t50-recovery-rules/SKILL.md #   证据等级、BoardConfig 规则
-│       └── t50-recovery-workflow/SKILL.md # Phase 1-7 构建工作流
+│   ├── memory/memory.json              #   MCP 知识图谱持久化
+│   ├── plans/                          #   构建计划文档
+│   └── skills/                         #   专项 Skills (Git 追踪)
+│       ├── mcp-routing/SKILL.md        #     MCP 工具路由规则
+│       ├── t50-recovery-rules/SKILL.md #     证据等级、BoardConfig 规则
+│       └── t50-recovery-workflow/SKILL.md #  Phase 1-7 构建工作流
 ├── .githooks/                          # Git Hooks (core.hooksPath=.githooks)
 │   ├── post-checkout                   #   checkout 后: submodule update + skills 同步
 │   ├── post-merge                      #   pull 后: submodule update
 │   ├── pre-commit                      #   commit 前: .trae→.claude skills 同步
 │   └── pre-push                        #   push 前: submodule auto-stage + skills 校验
 ├── .github/workflows/
-│   ├── build.yml                       # 主构建 workflow (OrangeFox R12.1)
-│   └── build-test-slimhub.yml          # 测试用精简构建
+│   ├── build.yml                       #   主构建 workflow (OrangeFox R12.1)
+│   └── build-test-slimhub.yml          #   测试用精简构建
 ├── Device_Tree/                        # [SUBMODULE] 设备树 (独立仓库)
 │   ├── BoardConfig.mk                  #   ★ 核心配置: 旋转/像素/触摸/分区
 │   ├── device.mk                       #   设备特定模块
@@ -25,25 +26,27 @@ T50-OrangeFox/                          # 主仓库 (submodule 容器)
 │   ├── omni_tb8786p1_64_k510_wifi.mk   #   omni 构建入口
 │   ├── twrp_tb8786p1_64_k510_wifi.mk   #   TWRP 构建入口
 │   ├── prebuilt/
-│   │   ├── kernel                      #   预编译内核
-│   │   └── dtb.img                     #   预编译 DTB
+│   │   ├── kernel                      #     预编译内核
+│   │   └── dtb.img                     #     预编译 DTB
 │   ├── recovery/root/
 │   │   ├── init.recovery.mt8786.rc     #   ★ ADB/USB 配置 (MT8786 专用)
-│   │   ├── init.recovery.mt6768.rc     #   MT6768 别名
-│   │   ├── mtk-plpath-utils.rc         #   MTK 分区路径工具
-│   │   └── snapuserd.rc                #   A/B snapshot 守护进程
+│   │   ├── init.recovery.mt6768.rc     #     MT6768 别名
+│   │   ├── mtk-plpath-utils.rc         #     MTK 分区路径工具
+│   │   └── snapuserd.rc                #     A/B snapshot 守护进程
 │   └── Raw_img/                        #   Stock 原始镜像 (逆向分析用)
 │       ├── vendor_boot_a.bin           #   ★ Stock vendor_boot (含 PLATFORM+RECOVERY)
-│       ├── boot_a.bin                  #   Stock boot
-│       ├── init_boot_a.bin             #   Stock init_boot
-│       └── lk_a.bin                    #   Stock Little Kernel
-├── scripts/                            # 工具脚本
-│   ├── analyze_stock_ramdisk.py        #   逆向分析 stock vendor_boot ramdisk
-│   ├── analyze_fox_ramdisk.py          #   分析 OrangeFox ramdisk (ADB/属性)
-│   ├── dtb_deep_analysis.py            #   DTB 深度分析 (panel/touch/fb)
-│   └── sync-agent-dirs.sh              #   .claude↔.trae skills 同步脚本
-├── repack_vendor_boot.py               # ★ 合并 stock PLATFORM + Fox RECOVERY → 可刷入镜像
-├── verify_fragments.py                 #   验证 vendor_boot fragment 结构
+│       ├── boot_a.bin                  #     Stock boot
+│       ├── init_boot_a.bin             #     Stock init_boot
+│       └── lk_a.bin                    #     Stock Little Kernel
+├── scripts/                            # Python 工具脚本 (uv + ruff + pyright)
+│   ├── repack_vendor_boot.py           #   ★ CI 核心: 合并 stock PLATFORM + Fox RECOVERY
+│   ├── verify_fragments.py             #     验证 vendor_boot fragment 结构
+│   ├── inspect_repacked.py             #     诊断 repacked ramdisk 配置 (ADB/旋转/触摸)
+│   ├── analyze_stock_ramdisk.py        #     逆向分析 stock vendor_boot ramdisk
+│   ├── analyze_fox_ramdisk.py          #     分析 OrangeFox ramdisk (ADB/属性)
+│   ├── dtb_deep_analysis.py            #     DTB 深度分析 (panel/touch/fb)
+│   └── sync-agent-dirs.sh              #     .claude↔.trae skills 同步脚本
+├── pyproject.toml                      # Python 项目配置 (ruff/pyright)
 ├── .gitignore                          # 忽略规则
 ├── .gitmodules                         # Submodule 定义 (Device_Tree)
 ├── CLAUDE.md                           # 本文件
@@ -53,8 +56,10 @@ T50-OrangeFox/                          # 主仓库 (submodule 容器)
 # ├── ci_artifacts/                     # CI 下载产物 + repack 结果
 # ├── release_output/                   # Release 产物
 # ├── stock_images/                     # Stock 镜像备份
+# ├── .venv/                            # Python 虚拟环境 (uv)
 # ├── __pycache__/                      # Python 字节码缓存
 # ├── .mypy_cache/                      # mypy 类型检查缓存
+# ├── .ruff_cache/                      # ruff 缓存
 # └── .trae/                            # Trae IDE 本地工作副本 (skills 同步)
 ```
 

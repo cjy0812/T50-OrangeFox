@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Deep DTB analysis: find panel, touch, rotation, framebuffer, pixel format."""
 
-import struct, subprocess, tempfile, os, sys
+import os
+import struct
+import subprocess
+import sys
+import tempfile
 
 
 def find_dtbs(data):

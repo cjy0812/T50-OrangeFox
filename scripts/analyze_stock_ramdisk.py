@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Analyze stock vendor_boot ramdisk for display/touch/rotation/ADB clues."""
 
-import sys, os, subprocess
+import os
+import subprocess
+import sys
 
 sys.path.insert(0, "/mnt/g/GitHub/T50/T50-OrangeFox")
-from repack_vendor_boot import parse_vb_v4, extract_fragment_data, extract_cpio_gz
+from repack_vendor_boot import extract_cpio_gz, extract_fragment_data, parse_vb_v4
 
 STOCK = "/mnt/g/GitHub/T50/T50-OrangeFox/Device_Tree/Raw_img/vendor_boot_a.bin"
 OUT = "/tmp/t50_stock"
@@ -23,19 +25,19 @@ def main():
     extract_cpio_gz(extract_fragment_data(vb, 0), OUT, "PLATFORM")
 
     # List top-level
-    print(f"\n=== Top-level dirs ===")
+    print("\n=== Top-level dirs ===")
     for d in sorted(os.listdir(OUT)):
         print(f"  {d}")
 
     # Search properties
-    print(f"\n=== Key properties ===")
+    print("\n=== Key properties ===")
     for root, dirs, files in os.walk(OUT):
         for fn in files:
             fp = os.path.join(root, fn)
             if not fn.endswith(".prop") and not fn.endswith(".rc"):
                 continue
             try:
-                with open(fp, "r", errors="ignore") as f:
+                with open(fp, errors="ignore") as f:
                     for line in f:
                         low = line.lower()
                         if any(
@@ -58,29 +60,29 @@ def main():
                         ):
                             rel = fp.replace(OUT, "")
                             print(f"  {rel}: {line.strip()}")
-            except:
+            except Exception:
                 pass
 
     # Show init.recovery RC files
-    print(f"\n=== init.recovery RC files ===")
+    print("\n=== init.recovery RC files ===")
     for root, dirs, files in os.walk(OUT):
         for fn in files:
             if "init.recovery" in fn or "init.usb" in fn:
                 fp = os.path.join(root, fn)
                 rel = fp.replace(OUT, "")
                 print(f"\n--- {rel} ---")
-                with open(fp, "r", errors="ignore") as f:
+                with open(fp, errors="ignore") as f:
                     print(f.read()[:2000])
 
     # Show any hw-*.rc files
-    print(f"\n=== hw init RC files ===")
+    print("\n=== hw init RC files ===")
     for root, dirs, files in os.walk(OUT):
         for fn in files:
             if fn.startswith("hw-") and fn.endswith(".rc"):
                 fp = os.path.join(root, fn)
                 rel = fp.replace(OUT, "")
                 print(f"\n--- {rel} ---")
-                with open(fp, "r", errors="ignore") as f:
+                with open(fp, errors="ignore") as f:
                     print(f.read()[:1000])
 
 

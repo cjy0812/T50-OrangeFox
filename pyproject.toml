@@ -1,0 +1,27 @@
+[project]
+name = "t50-orangefox-utils"
+version = "0.5.0"
+description = "T50 OrangeFox Recovery build utilities"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = ["ruff>=0.16.6", "pyright>=1.1.411"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP"]
+ignore = ["N816", "E741", "E501", "N806"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+include = ["scripts"]

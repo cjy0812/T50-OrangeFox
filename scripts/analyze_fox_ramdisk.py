@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Analyze OrangeFox CI vendor_boot ramdisk."""
 
-import sys, os, subprocess
+import os
+import subprocess
+import sys
 
 sys.path.insert(0, "/mnt/g/GitHub/T50/T50-OrangeFox")
-from repack_vendor_boot import parse_vb_v4, extract_fragment_data, extract_cpio_gz
+from repack_vendor_boot import extract_cpio_gz, extract_fragment_data, parse_vb_v4
 
 FOX = "/mnt/g/GitHub/T50/T50-OrangeFox/ci_artifacts/vendor_boot.img"
 OUT = "/tmp/t50_fox"
@@ -27,16 +29,16 @@ def main():
             try:
                 extract_cpio_gz(extract_fragment_data(vb, idx), OUT, f"FRAG{idx}")
                 break
-            except:
+            except Exception:
                 continue
 
     # Search for adbd service definition
-    print(f"\n=== Searching for adbd service ===")
+    print("\n=== Searching for adbd service ===")
     for root, dirs, files in os.walk(OUT):
         for fn in files:
             if fn.endswith(".rc"):
                 fp = os.path.join(root, fn)
-                with open(fp, "r", errors="ignore") as f:
+                with open(fp, errors="ignore") as f:
                     content = f.read()
                 if "adbd" in content:
                     rel = fp.replace(OUT, "")
@@ -46,12 +48,12 @@ def main():
                             print(f"  {line}")
 
     # Check default.prop
-    print(f"\n=== Key properties ===")
+    print("\n=== Key properties ===")
     for root, dirs, files in os.walk(OUT):
         for fn in files:
             if fn.endswith(".prop"):
                 fp = os.path.join(root, fn)
-                with open(fp, "r", errors="ignore") as f:
+                with open(fp, errors="ignore") as f:
                     for line in f:
                         low = line.lower()
                         if any(
@@ -70,14 +72,14 @@ def main():
                             print(f"  {rel}: {line.strip()}")
 
     # Check init.recovery RC
-    print(f"\n=== init.recovery RC files ===")
+    print("\n=== init.recovery RC files ===")
     for root, dirs, files in os.walk(OUT):
         for fn in files:
             if "init.recovery" in fn or "init.usb" in fn:
                 fp = os.path.join(root, fn)
                 rel = fp.replace(OUT, "")
                 print(f"\n--- {rel} ---")
-                with open(fp, "r", errors="ignore") as f:
+                with open(fp, errors="ignore") as f:
                     print(f.read()[:2000])
 
 
