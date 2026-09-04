@@ -104,3 +104,19 @@ Kernel / LK / DTB
 > "从设备实际读取"
 
 必须立即执行对应 MCP。**不能回复一段分析后再考虑使用工具。**
+
+---
+
+## 双 Agent 同步机制
+
+本项目同时支持 **Claude Code**（`.claude/`）和 **Trae IDE**（`.trae/`），通过 Git Hook 自动保持 `.claude/skills/` ↔ `.trae/skills/` 双向同步。
+
+> **如果当前 Agent 是 Trae，请务必在项目创建 `.trae` 文件夹，以保证 Git Hook 正常同步 Agent 数据！**
+
+同步规则：
+
+- `.claude/skills/` 是 Git 中的权威副本（提交到仓库）
+- `.trae/skills/` 是 Trae IDE 的本地工作副本（已加入 `.gitignore`，不提交）
+- `pre-commit`：自动将 `.trae/skills/` 的变更同步到 `.claude/skills/`
+- `pre-push`：验证双端同步，未同步时阻止 push；同时阻止 `.trae/` 被提交
+- `post-checkout`：自动将 `.claude/skills/` 同步到 `.trae/skills/`

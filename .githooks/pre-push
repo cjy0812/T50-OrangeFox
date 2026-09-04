@@ -1,4 +1,37 @@
 #!/bin/sh
-dir="$(cd "$(dirname "$0")" && pwd)"
-pwsh -NoProfile -ExecutionPolicy Bypass -File "$dir/pre-push.ps1"
-exit $?
+# pre-push hook
+# 1. If .trae/ exists, verify .trae/skills/ <-> .claude/skills/ are in sync
+# 2. Block push if not synced
+# 3. Defensive check: ensure .trae/ files are not staged
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+TRAE_DIR="${ROOT_DIR}/.trae"
+SYNC_SCRIPT="${ROOT_DIR}/scripts/sync-agent-dirs.sh"
+
+if [ -d "$TRAE_DIR" ]; then
+    if [ -f "$SYNC_SCRIPT" ]; then
+        sh "$SYNC_SCRIPT" --check
+        CHECK_RESULT=$?
+        if [ $CHECK_RESULT -ne 0 ]; then
+            echo ""
+            echo "[BLOCKED] .trae/skills/ and .claude/skills/ are NOT in sync!"
+            echo "  Run: sh scripts/sync-agent-dirs.sh"
+            echo "  Then: git add .claude/skills/ && git commit --amend --no-edit"
+            echo ""
+            exit 1
+        fi
+    fi
+
+    TRAE_STAGED=$(git diff --cached --name-only -- ".trae/" 2>/dev/null)
+    if [ -n "$TRAE_STAGED" ]; then
+        echo ""
+        echo "[BLOCKED] .trae/ files are staged for commit!"
+        echo "  .trae/ should NOT be pushed (it is a local Trae IDE working copy)."
+        echo "  Remove from staging: git reset HEAD .trae/"
+        echo "  Or add to .gitignore: echo '.trae/' >> .gitignore"
+        echo ""
+        exit 1
+    fi
+fi
+
+exit 0

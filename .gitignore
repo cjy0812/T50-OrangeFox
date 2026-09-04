@@ -2,3 +2,4 @@
 release_output/
 stock_images/
 .mypy_cache/
+.trae/
