@@ -1,4 +1,4 @@
-name: "[test-slimhub] OrangeFox R12.1 构建 (T50)"
+name: "[test-phase3] OrangeFox R12.1 构建 (T50)"
 
 on:
   workflow_dispatch:
@@ -51,6 +51,11 @@ on:
         required: true
         default: "false"
 
+      BUILD_MODE:
+        description: "构建模式 (debug: 产物放artifacts / release: 可刷入镜像上传Release)"
+        required: true
+        default: "release"
+
 jobs:
   build:
     if: github.event.repository.owner.id == github.event.sender.id
@@ -71,6 +76,7 @@ jobs:
           echo "设备名称: ${{ github.event.inputs.DEVICE_NAME }}"
           echo "Makefile 名称: ${{ github.event.inputs.MAKEFILE_NAME }}"
           echo "构建目标: ${{ github.event.inputs.BUILD_TARGET }}"
+          echo "构建模式: ${{ github.event.inputs.BUILD_MODE }}"
           echo "::endgroup::"
 
       - name: 清理磁盘空间
@@ -123,16 +129,25 @@ jobs:
           version: ${{ steps.cache-key.outputs.week }}
           execute_install_scripts: false
 
-      - name: 更新 apt 包至最新
+      - name: 更新系统包至最新
         run: |
           sudo apt update -qq
-          UPGRADES=$(apt list --upgradable 2>/dev/null | grep -v "^Listing" | wc -l)
-          if [ "$UPGRADES" -gt 0 ]; then
-            echo "::notice::有 $UPGRADES 个包可升级，升级中..."
-            sudo apt upgrade -yq
-          else
-            echo "所有包已是最新"
-          fi
+          HOLD_PKGS=(
+            snapd snapcraft
+            lxd lxcfs
+            cloud-init
+            apport popularity-contest whoopsie
+            ubuntu-advantage-tools
+            unattended-upgrades
+            fwupd
+            packagekit
+            modemmanager
+          )
+          sudo apt-mark hold "${HOLD_PKGS[@]}"
+          UPGRADES=$(apt list --upgradable 2>/dev/null | grep -v '^Listing' | wc -l)
+          echo "::notice::升级 $UPGRADES 个包（已排除无用服务包）"
+          sudo apt upgrade -yq
+          sudo apt-mark unhold "${HOLD_PKGS[@]}"
 
       - name: 准备环境（动态内核模块）
         run: |
@@ -337,12 +352,11 @@ jobs:
           key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
 
       - name: 上传到 Release
+        if: github.event.inputs.BUILD_MODE == 'release'
         uses: softprops/action-gh-release@v3
         with:
           files: |
             workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
-            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
-            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz
           fail_on_unmatched_files: false
           overwrite_files: true
           name: OrangeFox-R12.1-${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
@@ -351,5 +365,18 @@ jobs:
             OrangeFox 分支: ${{ github.event.inputs.FOX_BRANCH }}
             设备: ${{ github.event.inputs.DEVICE_NAME }}
             构建目标: ${{ github.event.inputs.BUILD_TARGET }}
+            构建模式: ${{ github.event.inputs.BUILD_MODE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传产物到 Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.BUILD_MODE }}-build-${{ github.run_id }}
+          path: |
+            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
+            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
+            workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz
+          if-no-files-found: warn
+          retention-days: ${{ github.event.inputs.BUILD_MODE == 'debug' && 14 || 90 }}
