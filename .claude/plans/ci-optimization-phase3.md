@@ -23,10 +23,66 @@
 - 可能破坏 GitHub Actions runner 预装环境
 - 无任何收益（无关包的升级对构建无帮助）
 
-**修复方案:** `apt install --only-upgrade -yq <packages>`
-- `--only-upgrade`: 只升级已安装的包，不安装新包
-- 只指定我们缓存的 30 个包名
-- apt 自动跳过无需升级的包，无需手动计数
+**修复方案: `apt-mark hold` + `apt upgrade` + `apt-mark unhold`**
+
+用 `apt-mark hold` 锁定无用服务包，然后 `apt upgrade` 升级其余所有包，最后 `unhold` 解锁。
+
+**调查依据:**
+- GitHub 官方 `actions/runner-images` 的 `configure-apt.sh` 在构建镜像时做了 `apt-get purge unattended-upgrades` + `apt-get upgrade -y`，说明官方也认为这些服务包不需要
+- `apt-mark hold` 是 dpkg 原生功能，Kubernetes 社区广泛使用（`apt-mark hold kubelet kubeadm kubectl`）
+- 社区无标准排除列表，需自行根据 runner 环境确定
+
+**Hold 列表（只 hold 肯定不用的包，不确定的不 hold）：**
+
+| 分类          | 包名                                     | 原因          |
+| ------------- | ---------------------------------------- | ------------- |
+| Snap 生态     | `snapd` `snapcraft`                      | 构建不用 snap |
+| LXD/LXC 容器  | `lxd` `lxcfs`                            | 不用容器管理  |
+| 云初始化      | `cloud-init`                             | CI 环境不用   |
+| 错误报告/遥测 | `apport` `popularity-contest` `whoopsie` | 不用          |
+| Ubuntu Pro    | `ubuntu-advantage-tools`                 | 不用          |
+| 自动升级      | `unattended-upgrades`                    | CI 不需要     |
+| 固件更新      | `fwupd`                                  | CI 环境不用   |
+| 包管理抽象层  | `packagekit`                             | 不用          |
+| 调制解调器    | `modemmanager`                           | 不用          |
+
+**实现:**
+```yaml
+- name: 更新系统包至最新
+  run: |
+    sudo apt update -qq
+    HOLD_PKGS=(
+      snapd snapcraft
+      lxd lxcfs
+      cloud-init
+      apport popularity-contest whoopsie
+      ubuntu-advantage-tools
+      unattended-upgrades
+      fwupd
+      packagekit
+      modemmanager
+    )
+    sudo apt-mark hold "${HOLD_PKGS[@]}"
+    UPGRADES=$(apt list --upgradable 2>/dev/null | grep -v '^Listing' | wc -l)
+    echo "::notice::升级 $UPGRADES 个包（已排除无用服务包）"
+    sudo apt upgrade -yq
+    sudo apt-mark unhold "${HOLD_PKGS[@]}"
+```
+
+**方案对比:**
+
+| 方案                                | 升级包数 |        维护成本        | 风险  | 推荐度 |
+| ----------------------------------- | :------: | :--------------------: | :---: | :----: |
+| `apt upgrade`（当前）               |   110    |           无           | 中高  |   ❌    |
+| `apt install --only-upgrade <30个>` |   0-3    |   高（需同步包列表）   | 最低  |   🟡    |
+| **`apt-mark hold` + `apt upgrade`** |   ~98    | **低（hold列表稳定）** |  低   |   ✅    |
+
+**推荐理由:**
+1. 不用手动维护包白名单（构建工具链自动升级）
+2. hold 列表很稳定（snapd/cloud-init 这些不会变）
+3. dpkg 原生功能，Kubernetes 等大型项目在用
+4. unhold 在 upgrade 后执行，不影响后续步骤
+5. 构建相关包（gcc/make/python/libc 等）自动升级，不会漏
 
 ### 问题 2: 缺少 debug/release 模式区分
 
@@ -60,7 +116,7 @@
 
 ## 执行步骤
 
-### Step A: 修复 apt upgrade → apt install --only-upgrade (P0 紧急)
+### Step A: 修复 apt upgrade → apt-mark hold + apt upgrade (P0 紧急)
 
 **修改文件:** `build-test-slimhub.yml`（先测试）
 
@@ -79,32 +135,31 @@
       echo "所有包已是最新"
     fi
 
-# ✅ 修复：只升级缓存的 30 个包
-- name: 更新缓存包至最新
+# ✅ 修复：hold 无用服务包 + apt upgrade + unhold
+- name: 更新系统包至最新
   run: |
     sudo apt update -qq
-    sudo apt install --only-upgrade -yq \
-      gperf gcc-multilib gcc-10-multilib \
-      g++-multilib g++-10-multilib \
-      libc6-dev lib32ncurses-dev \
-      x11proto-core-dev libx11-dev tree \
-      lib32z-dev libgl1-mesa-dev libxml2-utils \
-      xsltproc bc ccache \
-      lib32readline-dev lib32z1-dev \
-      liblz4-tool libncurses-dev \
-      libsdl1.2-dev build-essential \
-      libgtk-3-dev libglu1-mesa-dev \
-      freeglut3-dev git libxml2 lzop \
-      pngcrush schedtool squashfs-tools \
-      imagemagick libbz2-dev lzma \
-      ncftp qemu-user-static \
-      libstdc++-10-dev libncurses6 \
-      python3 tar
+    HOLD_PKGS=(
+      snapd snapcraft
+      lxd lxcfs
+      cloud-init
+      apport popularity-contest whoopsie
+      ubuntu-advantage-tools
+      unattended-upgrades
+      fwupd
+      packagekit
+      modemmanager
+    )
+    sudo apt-mark hold "${HOLD_PKGS[@]}"
+    UPGRADES=$(apt list --upgradable 2>/dev/null | grep -v '^Listing' | wc -l)
+    echo "::notice::升级 $UPGRADES 个包（已排除无用服务包）"
+    sudo apt upgrade -yq
+    sudo apt-mark unhold "${HOLD_PKGS[@]}"
 ```
 
 **验证:**
-- 日志中 `apt install --only-upgrade` 只升级 0-3 个缓存包
-- 不再出现 110 个包升级
+- 日志中确认 hold 生效（snapd 等包被跳过）
+- 升级包数从 110 降至 ~98（排除了 12 个无用服务包）
 - 构建正常完成
 
 ---
@@ -179,12 +234,12 @@ echo "构建模式: ${{ github.event.inputs.BUILD_MODE }}"
       workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
       workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.cpio.gz
     if-no-files-found: warn
-    retention-days: ${{ github.event.inputs.BUILD_MODE == 'debug' && 7 || 30 }}
+    retention-days: ${{ github.event.inputs.BUILD_MODE == 'debug' && 14 || 90 }}
 ```
 
 **retention-days 策略:**
-- Debug: 7 天（调试用，短期保留）
-- Release: 30 天（长期保留原始产物）
+- Debug: 14 天（调试用，短期保留）
+- Release: 90 天（长期保留原始产物）
 
 ---
 
@@ -211,10 +266,11 @@ echo "构建模式: ${{ github.event.inputs.BUILD_MODE }}"
 
 ## 验证清单
 
-- [ ] Step A: 日志中 `apt install --only-upgrade` 只升级 0-3 个包（非 110 个）
+- [ ] Step A: 日志中确认 hold 生效（snapd 等包被跳过）
+- [ ] Step A: 升级包数从 110 降至 ~98
 - [ ] Step B: BUILD_MODE input 正确显示在运行参数中
 - [ ] Step C (debug): 不触发 Release 上传，所有产物在 Artifacts
 - [ ] Step C (release): .img 在 Release，.zip/.cpio.gz 在 Artifacts
-- [ ] Step C: retention-days debug=7, release=30
+- [ ] Step C: retention-days debug=14, release=90
 - [ ] 合并: build.yml 与 test yml 逻辑一致
 - [ ] 所有: YAML 语法通过
