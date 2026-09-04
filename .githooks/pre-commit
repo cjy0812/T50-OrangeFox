@@ -1,18 +1,30 @@
 #!/bin/sh
 # pre-commit hook
-# If .trae/ exists, sync .trae/skills/ -> .claude/skills/ before commit
-# This captures any edits made in Trae IDE
+# Trigger ONLY when staged area has .claude/skills/ or .trae/ changes,
+# OR when .trae/skills/ and .claude/skills/ are out of sync (Trae-side edits)
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TRAE_DIR="${ROOT_DIR}/.trae"
 SYNC_SCRIPT="${ROOT_DIR}/scripts/sync-agent-dirs.sh"
 
-if [ ! -d "$TRAE_DIR" ]; then
+if [ ! -f "$SYNC_SCRIPT" ]; then
     exit 0
 fi
 
-if [ ! -f "$SYNC_SCRIPT" ]; then
-    echo "[WARN] sync-agent-dirs.sh not found, skip sync"
+STAGED_CLAUDE=$(git diff --cached --name-only -- ".claude/skills/" 2>/dev/null)
+STAGED_TRAE=$(git diff --cached --name-only -- ".trae/" 2>/dev/null)
+NEED_SYNC=false
+
+if [ -n "$STAGED_CLAUDE" ] || [ -n "$STAGED_TRAE" ]; then
+    NEED_SYNC=true
+fi
+
+if [ -d "${ROOT_DIR}/.trae/skills" ]; then
+    if ! sh "$SYNC_SCRIPT" --check >/dev/null 2>&1; then
+        NEED_SYNC=true
+    fi
+fi
+
+if [ "$NEED_SYNC" = "false" ]; then
     exit 0
 fi
 
@@ -22,9 +34,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-CHANGED=$(git diff --name-only --cached -- ".claude/skills/" 2>/dev/null)
 UNCHANGED=$(git diff --name-only -- ".claude/skills/" 2>/dev/null)
-
 if [ -n "$UNCHANGED" ]; then
     git add ".claude/skills/"
 fi
