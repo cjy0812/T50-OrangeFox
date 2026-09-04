@@ -1,2 +1,4 @@
 *.txt
 fix_shell.py
+release_output/
+stock_images/

@@ -192,7 +192,229 @@ gh run view <run_id> --log | grep -E "Cache (saved|hit|miss)"  # 确认行为
 
 ---
 
-## 7. 回滚方案
+## 7. CI 流程图
+
+```mermaid
+flowchart TD
+    A([👤 workflow_dispatch 手动触发]) --> B[📋 显示运行参数]
+    B --> C[🧹 清理非必要软件包<br/>slimhub_actions]
+    C --> D[📥 检出代码<br/>actions/checkout@v7]
+    D --> E[📦 安装 apt 依赖<br/>gperf gcc ccache ...]
+    E --> F[☕ 安装 OpenJDK 11<br/>actions/setup-java@v6]
+    F --> G{🔑 SSH 密钥?}
+    G -->|是| H[🔐 设置 SSH 密钥<br/>webfactory/ssh-agent]
+    G -->|否| I[📥 安装 repo 工具]
+    H --> I
+    I --> J[📂 初始化工作目录<br/>mkdir workspace]
+    J --> K[🔧 准备缓存键<br/>week=YYYY-W##]
+    K --> L[🔄 同步 OrangeFox 源码<br/>repo sync]
+    L --> M[🌳 克隆设备树]
+    M --> N{📁 通用树?}
+    N -->|有| O[🌳 克隆通用树]
+    N -->|无| P[📦 同步设备依赖]
+    O --> P
+    P --> Q[💾 设置交换空间<br/>12GB swap]
+    Q --> R[♻️ 恢复 ccache<br/>actions/cache/restore@v6]
+
+    R --> S{🐛 SSH 调试?}
+    S -->|是| T[🔌 开启 tmate SSH]
+    S -->|否| U[🏗️ 构建]
+    T --> U
+
+    U --> V[🔨 mka vendorbootimage<br/>ccache -M 10G]
+
+    V --> W{构建结果?}
+    W -->|✅ 成功| X[💾 保存 ccache<br/>actions/cache/save@v6]
+    W -->|❌ 失败| X
+
+    X --> Y[📤 上传到 Release<br/>action-gh-release@v3]
+    Y --> Z([✅ 完成])
+
+    style A fill:#4CAF50,color:#fff
+    style Z fill:#4CAF50,color:#fff
+    style V fill:#FF9800,color:#fff
+    style R fill:#2196F3,color:#fff
+    style X fill:#2196F3,color:#fff
+    style U fill:#FF9800,color:#fff
+    style W fill:#f44336,color:#fff
+```
+
+### 耗时拆解 (冷构建 ~33min)
+
+```mermaid
+pie title 冷构建 33:02 时间分布
+    "构建 (mka)" : 21
+    "清理 + apt + 环境" : 5
+    "repo sync" : 2
+    "缓存恢复/上传" : 3
+    "其他" : 2
+```
+
+### 耗时拆解 (热构建 ~11min, ccache命中)
+
+```mermaid
+pie title 热构建 11:32 时间分布
+    "构建 (mka)" : 7
+    "清理 + apt + 环境" : 1
+    "repo sync" : 2
+    "其他" : 1.5
+```
+
+### 缓存生命周期
+
+```mermaid
+sequenceDiagram
+    participant W as 工作流
+    participant R as actions/cache/restore
+    participant S as actions/cache/save
+    participant GH as GitHub Cache (10GB)
+
+    Note over W,GH: === 第 1 周 (W36) 首次运行 ===
+    W->>R: key=ccache-...-W36
+    R->>GH: 查找 W36
+    GH-->>R: ❌ MISS
+    R-->>W: 无缓存，冷构建
+    W->>W: 构建 33min
+    W->>S: key=ccache-...-W36
+    S->>GH: 保存 400MB ✅
+
+    Note over W,GH: === 第 1 周 (W36) 二次运行 ===
+    W->>R: key=ccache-...-W36
+    R->>GH: 查找 W36
+    GH-->>R: ✅ HIT
+    R-->>W: 恢复缓存
+    W->>W: 构建 7min 🔥
+    W->>S: key=ccache-...-W36
+    S->>GH: 覆盖更新 400MB ✅
+
+    Note over W,GH: === 第 2 周 (W37) ===
+    W->>R: key=ccache-...-W37
+    R->>GH: 查找 W37
+    GH-->>R: ❌ MISS
+    R->>GH: restore-keys: ccache-...-
+    GH-->>R: ✅ 回退到 W36
+    R-->>W: 恢复 W36 缓存
+    W->>W: 构建 8min 🔥
+    W->>S: key=ccache-...-W37
+    S->>GH: 保存新 W37 400MB ✅
+
+    Note over W,GH: === 25 周后 ===
+    GH->>GH: 配额超 10GB → LRU 删除 W36
+```
+
+## 8. 深度分析：优化点 & 工具链（基于冷构建实测数据）
+
+> 数据来源: [run 33782799774](https://github.com/cjy0812/T50-OrangeFox/actions/runs/33782799774) 冷构建 ~42min
+
+### 8.1 逐步骤实测耗时
+
+```
+冷构建 42min 分解:
+  Set up job        4s      ▏
+  显示运行参数        0s      
+  清理非必要软件包    4m 30s  ████████          ← 🚨 隐藏瓶颈 #3 (10.7%)
+  检出代码           2s      
+  准备环境 (apt)     1m 17s  ██                ← 用户质疑
+  安装 OpenJDK       5s      
+  SSH 密钥          0s      
+  安装 repo          1s      
+  初始化工作目录      0s      
+  准备缓存键          0s      
+  同步 OrangeFox 源码 5m 37s  ██████████        ← 用户质疑 #2 (13.4%)
+  克隆设备树          4s      
+  通用树 / 依赖 / swap 3s      
+  恢复 ccache        2s      
+  SSH 调试           0s      
+  ───────────────────────────
+  构建 recovery      30m 18s ████████████████████████████████████████████████  ← 72%
+  ───────────────────────────
+  保存 ccache        5s      
+  上传 Release       10s     
+```
+
+### 8.2 用户质疑的 ROI 重新分析
+
+#### Q1: 准备环境 (apt) 缓存 — 1m 17s 值得缓存吗？
+
+| 项目         | 值                  |
+| ------------ | ------------------- |
+| 冷构建耗时   | 1m 17s              |
+| 可缓存部分   | 下载 .deb 包 (~30s) |
+| 不可缓存部分 | 解包 + 配置 (~47s)  |
+| 缓存大小     | ~500MB              |
+| 节省         | ~30s/次             |
+| 配额占比     | 5% (500MB/10GB)     |
+
+✅ **值得。** 500MB 配额轻量，每次冷构建省 30s，key 用 `hashFiles('build.yml')` 自动失效。
+
+#### Q2: 同步 OrangeFox 源码 (repo sync) 缓存 — 5m 37s 值得缓存吗？
+
+| 项目         | 值                            |
+| ------------ | ----------------------------- |
+| 冷构建耗时   | 5m 37s                        |
+| 可缓存部分   | git objects 下载 (~3min)      |
+| 不可缓存部分 | checkout + 脚本逻辑 (~2.5min) |
+| 缓存大小     | **~8GB**                      |
+| 节省         | ~3min/次                      |
+| 配额占比     | **80% (8GB/10GB)**            |
+
+❌ **不值得。** 8GB 占 80% 配额，只省 3min。源码更新后 cache 立即过期。替代方向：`--depth=1` 浅克隆。
+
+### 8.3 🚨 新发现：slimhub 是隐藏瓶颈！
+
+`清理非必要软件包` 占 **4m 30s (10.7%)**，之前完全忽略！
+
+```
+slimhub 做了什么 (4m 30s):
+  apt-get remove android-sdk         → 释放 ~5GB
+  apt-get remove dotnet-sdk          → 释放 ~2GB  
+  apt-get remove haskell-stack       → 释放 ~3GB
+  apt-get remove ...                 → 各种大型包
+  apt-get autoremove                 → 清理依赖
+  docker rmi                         → 清理 Docker 镜像
+  rm -rf /usr/share/dotnet           → 清理 .NET
+  rm -rf /usr/local/lib/android      → 清理 Android SDK
+```
+
+**slimhub 不可缓存**（清理的是系统包），但可以优化：
+
+| 方案                          |  节省  | 风险                       |
+| ----------------------------- | :----: | -------------------------- |
+| A. 跳过 slimhub               | 4m 30s | 磁盘空间不足，构建可能失败 |
+| B. 精简清理（只删最大的几个） | ~3min  | 磁盘略紧张                 |
+| C. 保持现状                   |   0    | 无                         |
+
+> **建议：方案 B** — 用自定义脚本替代 slimhub，只删除 Android SDK + .NET + Docker 镜像，跳过其他小包清理。预计 4m 30s → ~1min。
+
+### 8.4 修订后的优化优先级
+
+```
+🥇 P0: slimhub 精简    4m 30s → 1min     省 3m 30s  (零缓存成本)
+🥈 P1: apt 缓存         1m 17s → 47s      省 30s      (500MB 缓存)
+🥉 P2: repo --depth=1   5m 37s → ~3min    省 2m 30s   (需脚本支持)
+```
+
+### 8.5 工具链对比
+
+| 工具     | 当前                 | 替代方案     | 结论                        |
+| -------- | -------------------- | ------------ | --------------------------- |
+| 编译缓存 | **ccache**           | sccache      | 单机 CI 无优势。**保持**    |
+| 链接器   | GNU **ld**           | mold         | AOSP 不直接支持。**不适用** |
+| 磁盘清理 | **slimhub**          | 自定义脚本   | **建议替换**                |
+| 包管理器 | **apt**              | —            | 加 apt cache。**已规划**    |
+| 构建系统 | **mka**              | —            | AOSP 标准。**不可替换**     |
+| 源码同步 | **repo**             | —            | AOSP 标准。**不可替换**     |
+| 运行器   | **ubuntu-latest**    | ubuntu-24.04 | 显式 pin 版本               |
+| 缓存     | **actions/cache@v6** | —            | 官方最佳                    |
+
+### 8.6 总预期收益
+
+| 场景   | 当前   | 优化后 | 节省           |
+| ------ | ------ | ------ | -------------- |
+| 冷构建 | ~42min | ~35min | **7min (17%)** |
+| 热构建 | ~11min | ~9min  | 2min           |
+
+## 9. 回滚方案
 
 如果出现问题，回滚到当前 build.yml:
 
