@@ -14,7 +14,13 @@ STAGED_CLAUDE=$(git diff --cached --name-only -- ".claude/skills/" 2>/dev/null)
 STAGED_TRAE=$(git diff --cached --name-only -- ".trae/" 2>/dev/null)
 NEED_SYNC=false
 
-if [ -n "$STAGED_CLAUDE" ] || [ -n "$STAGED_TRAE" ]; then
+if [ -n "$STAGED_TRAE" ]; then
+    echo "[WARN] .trae/ files found in staging area, auto-unstaging..."
+    git reset HEAD -- .trae/ >/dev/null 2>&1
+    STAGED_TRAE=""
+fi
+
+if [ -n "$STAGED_CLAUDE" ]; then
     NEED_SYNC=true
 fi
 

@@ -1,0 +1,13 @@
+#!/bin/sh
+# post-merge hook
+# Auto-update submodules after git pull (which is fetch + merge)
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ -f "${ROOT_DIR}/.gitmodules" ]; then
+    SUBMODULE_STATUS=$(cd "$ROOT_DIR" && git submodule status 2>/dev/null)
+    if echo "$SUBMODULE_STATUS" | grep -q '^+'; then
+        echo "[submodule] Updating submodules after pull..."
+        (cd "$ROOT_DIR" && git submodule update --init --recursive 2>/dev/null)
+    fi
+fi

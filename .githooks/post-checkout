@@ -1,11 +1,22 @@
 #!/bin/sh
 # post-checkout hook
-# After git checkout/switch/clone, sync .claude/skills/ -> .trae/skills/
-# Trigger ONLY when .trae/ exists AND content is out of sync
+# 1. Auto-update git submodules after checkout/pull
+# 2. Sync .claude/skills/ -> .trae/skills/ if needed
 #
 # Arguments: $1=prev_head $2=new_head $3=is_branch_checkout (1=branch, 0=file)
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# --- Submodule auto-update ---
+if [ "$3" = "1" ] && [ -f "${ROOT_DIR}/.gitmodules" ]; then
+    SUBMODULE_STATUS=$(cd "$ROOT_DIR" && git submodule status 2>/dev/null)
+    if echo "$SUBMODULE_STATUS" | grep -q '^+'; then
+        echo "[submodule] Updating submodules..."
+        (cd "$ROOT_DIR" && git submodule update --init --recursive 2>/dev/null)
+    fi
+fi
+
+# --- Skills sync ---
 SYNC_SCRIPT="${ROOT_DIR}/scripts/sync-agent-dirs.sh"
 
 if [ ! -d "${ROOT_DIR}/.trae/skills" ]; then

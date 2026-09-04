@@ -1,11 +1,28 @@
 #!/bin/sh
 # pre-push hook
-# Trigger ONLY when staged area has .claude/skills/ or .trae/ changes
-# 1. Verify .trae/skills/ <-> .claude/skills/ are in sync
-# 2. Block push if not synced
-# 3. Defensive check: ensure .trae/ files are not staged
+# 1. Auto-stage submodule pointer if submodule has new commits
+# 2. Verify .trae/skills/ <-> .claude/skills/ are in sync
+# 3. Block push if .trae/ files are staged
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# --- Submodule auto-stage ---
+if [ -f "${ROOT_DIR}/.gitmodules" ]; then
+    SUBMODULE_STATUS=$(cd "$ROOT_DIR" && git submodule status 2>/dev/null)
+    if echo "$SUBMODULE_STATUS" | grep -q '^+'; then
+        echo "[submodule] Submodule has uncommitted updates, auto-staging..."
+        (cd "$ROOT_DIR" && git add .gitmodules 2>/dev/null)
+        # Stage each submodule with + prefix
+        echo "$SUBMODULE_STATUS" | while read line; do
+            if echo "$line" | grep -q '^+'; then
+                sub_path=$(echo "$line" | awk '{print $2}')
+                (cd "$ROOT_DIR" && git add "$sub_path" 2>/dev/null)
+            fi
+        done
+    fi
+fi
+
+# --- Skills sync ---
 SYNC_SCRIPT="${ROOT_DIR}/scripts/sync-agent-dirs.sh"
 
 STAGED_CLAUDE=$(git diff --cached --name-only -- ".claude/skills/" 2>/dev/null)
