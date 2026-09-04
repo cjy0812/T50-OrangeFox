@@ -118,31 +118,11 @@ jobs:
           WRAPPER_DIR="$HOME/.local/orangefox-ci-bin"
           mkdir -p "$WRAPPER_DIR"
 
-          REAL_REPO="$(which repo)"
           REAL_GIT="$(which git)"
-
-          echo "REAL_REPO=$REAL_REPO"
           echo "REAL_GIT=$REAL_GIT"
 
-          # --- repo wrapper ---
-          cat > "$WRAPPER_DIR/repo" << 'REPOEOF'
-          #!/bin/bash
-          REAL_REPO="__REAL_REPO__"
-          if [ "$1" = "sync" ]; then
-              HAS_DEPTH=0
-              for arg in "$@"; do
-                  case "$arg" in
-                      --depth|--depth=*) HAS_DEPTH=1; break ;;
-                  esac
-              done
-              if [ "$HAS_DEPTH" = "0" ]; then
-                  exec "$REAL_REPO" sync --depth=1 "${@:2}"
-              fi
-          fi
-          exec "$REAL_REPO" "$@"
-          REPOEOF
-
-          # --- git wrapper ---
+          # --- git wrapper (shallow clone only) ---
+          # NOTE: repo wrapper removed — newer repo versions don't support --depth on sync
           cat > "$WRAPPER_DIR/git" << 'GITEOF'
           #!/bin/bash
           REAL_GIT="__REAL_GIT__"
@@ -160,9 +140,8 @@ jobs:
           exec "$REAL_GIT" "$@"
           GITEOF
 
-          sed -i "s|__REAL_REPO__|$REAL_REPO|" "$WRAPPER_DIR/repo"
           sed -i "s|__REAL_GIT__|$REAL_GIT|" "$WRAPPER_DIR/git"
-          chmod +x "$WRAPPER_DIR/repo" "$WRAPPER_DIR/git"
+          chmod +x "$WRAPPER_DIR/git"
 
           echo "$WRAPPER_DIR" >> $GITHUB_PATH
 
