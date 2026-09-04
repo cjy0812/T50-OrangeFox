@@ -79,6 +79,12 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v7
 
+      - name: 准备缓存键
+        id: cache-key
+        run: |
+          mkdir -p ~/.ccache
+          echo "week=$(date +%Y-W%V)" >> $GITHUB_OUTPUT
+
       - name: 准备环境（缓存 apt 包）
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
@@ -99,8 +105,19 @@ jobs:
             ncftp qemu-user-static
             libstdc++-10-dev libncurses6
             python3 tar
-          version: 1.0
+          version: ${{ steps.cache-key.outputs.week }}
           execute_install_scripts: false
+
+      - name: 更新 apt 包至最新
+        run: |
+          sudo apt update -qq
+          UPGRADES=$(apt list --upgradable 2>/dev/null | grep -v "^Listing" | wc -l)
+          if [ "$UPGRADES" -gt 0 ]; then
+            echo "::notice::有 $UPGRADES 个包可升级，升级中..."
+            sudo apt upgrade -yq
+          else
+            echo "所有包已是最新"
+          fi
 
       - name: 准备环境（动态内核模块）
         run: |
@@ -161,12 +178,6 @@ jobs:
           git config --global user.name "Nico170420"
           git config --global user.email "b170420nc@gmail.com"
         id: pwd
-
-      - name: 准备缓存键
-        id: cache-key
-        run: |
-          mkdir -p ~/.ccache
-          echo "week=$(date +%Y-W%V)" >> $GITHUB_OUTPUT
 
       - name: 同步 OrangeFox 源码
         run: |
