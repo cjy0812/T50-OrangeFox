@@ -272,37 +272,8 @@ jobs:
           ccache -M 5G
           ccache -s
 
-          echo "=== Debug: BoardConfig.mk TW_THEME ==="
-          grep -E "TW_THEME|TW_ROTATION|TARGET_SCREEN" ${{ github.event.inputs.DEVICE_PATH }}/BoardConfig.mk || true
-          echo "=== Debug: Available themes ==="
-          find bootable/recovery/gui/theme -maxdepth 1 -type d 2>/dev/null || echo "No theme dir found"
-          echo "=== Debug: orangefox.mk TW_ROTATION check ==="
-          grep -n "TW_ROTATION" vendor/twrp/orangefox.mk 2>/dev/null || echo "No TW_ROTATION in orangefox.mk"
-          grep -n "TW_ROTATION" bootable/recovery/minuitwrp/Android.mk 2>/dev/null || echo "No TW_ROTATION in minuitwrp/Android.mk"
-
-          echo "=== Debug: envsetup.sh head ==="
-          head -50 build/envsetup.sh || true
-          echo "=== Debug: vendorsetup.sh ==="
-          cat ${{ github.event.inputs.DEVICE_PATH }}/vendorsetup.sh || true
-          echo "=== Debug: ldd bash ==="
-          ldd /bin/bash 2>&1 || true
-          echo "=== Debug: bash version ==="
-          bash --version | head -1 || true
-          echo "=== Debug: sourcing envsetup.sh with set -x ==="
-          set -x
-          source build/envsetup.sh 2>&1
-          ENV_EXIT=$?
-          set +x
-          echo "=== envsetup.sh exit code: $ENV_EXIT ==="
-          if [ $ENV_EXIT -ne 0 ]; then
-            echo "ERROR: envsetup.sh failed with exit code $ENV_EXIT"
-            echo "=== Debug: last 30 lines of envsetup.sh ==="
-            tail -30 build/envsetup.sh || true
-            echo "=== Debug: check for return/exit in envsetup.sh ==="
-            grep -n 'return\|exit' build/envsetup.sh | tail -20 || true
-            exit $ENV_EXIT
-          fi
-          lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng 2>&1 || { echo "ERROR: lunch failed with exit code $?"; exit 1; }
+          source build/envsetup.sh || { echo "ERROR: envsetup.sh failed"; exit 1; }
+          lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng || { echo "ERROR: lunch failed"; exit 1; }
 
           echo "===== BUILD VAR ====="
           get_build_var PRODUCT_OUT
