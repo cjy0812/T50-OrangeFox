@@ -272,7 +272,17 @@ jobs:
           ccache -M 5G
           ccache -s
 
-          source build/envsetup.sh || { echo "ERROR: envsetup.sh failed"; exit 1; }
+          # NOTE: OrangeFox's orangefox_envsetup() ends with:
+          #   [ -s $FOX_MANIFEST_ROOT/frameworks/base/services/core/xsd/vts/Android.mk ] && echo -n "" > ...
+          # In TWRP minimal manifest, frameworks/base/.../Android.mk does NOT exist,
+          # so [ -s ... ] returns 1, && short-circuits, and the whole expression returns 1.
+          # Since it's the LAST line in orangefox_envsetup(), the function returns 1,
+          # making source envsetup.sh appear to fail — but it's a FALSE POSITIVE.
+          # Workaround: ignore exit code, then verify environment is actually set up.
+          source build/envsetup.sh 2>&1 || true
+          type -t lunch >/dev/null 2>&1 || { echo "FATAL: envsetup.sh did not define 'lunch' — setup truly failed"; exit 1; }
+          echo "OK: envsetup.sh completed (exit code ignored per OrangeFox bug workaround)"
+
           lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng || { echo "ERROR: lunch failed"; exit 1; }
 
           echo "===== BUILD VAR ====="
