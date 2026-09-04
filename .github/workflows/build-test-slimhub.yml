@@ -315,7 +315,10 @@ jobs:
           ccache -M 5G
           ccache -s
 
-          source build/envsetup.sh || { echo "ERROR: envsetup.sh failed"; exit 1; }
+          source build/envsetup.sh 2>&1 || true
+          type -t lunch >/dev/null 2>&1 || { echo "FATAL: envsetup.sh did not define 'lunch' — setup truly failed"; exit 1; }
+          echo "OK: envsetup.sh completed (exit code ignored per OrangeFox bug workaround)"
+
           lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng || { echo "ERROR: lunch failed"; exit 1; }
 
           echo "===== BUILD VAR ====="
