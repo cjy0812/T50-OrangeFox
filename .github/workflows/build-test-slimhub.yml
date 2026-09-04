@@ -131,14 +131,12 @@ jobs:
 
       - name: 更新系统包至最新
         run: |
+          sudo apt-get purge -yq snapd unattended-upgrades 2>/dev/null || true
           sudo apt update -qq
           HOLD_PKGS=(
-            snapd snapcraft
-            lxd lxcfs
+            snapd
             cloud-init
-            apport popularity-contest whoopsie
-            ubuntu-advantage-tools
-            unattended-upgrades
+            apport
             fwupd
             packagekit
             modemmanager
@@ -150,7 +148,7 @@ jobs:
             fi
           done
           UPGRADES=$(apt list --upgradable 2>/dev/null | grep -v '^Listing' | wc -l)
-          echo "::notice::升级 $UPGRADES 个包（已排除 ${#HELD[@]} 个无用服务包: ${HELD[*]}）"
+          echo "::notice::升级 $UPGRADES 个包（已 hold ${#HELD[@]} 个无用服务包: ${HELD[*]}）"
           sudo apt upgrade -yq
           if [ ${#HELD[@]} -gt 0 ]; then
             sudo apt-mark unhold "${HELD[@]}"
