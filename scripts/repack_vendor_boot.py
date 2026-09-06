@@ -451,6 +451,7 @@ def main():
             "ro.hardware.egl",
             "ro.hardware.hwcomposer",
             "ro.sf.lcd_density",
+            "ro.opengles.version",
             "debug.renderengine.backend",
             "vendor.sf.hwc_repaint_fmt",
             "ro.surface_flinger.has_HDR_display",
