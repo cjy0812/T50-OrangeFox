@@ -154,13 +154,15 @@ def extract_cpio_gz(data, out_dir, label):
     return True
 
 
-def create_cpio_gz(src_dir, out_path):
+def create_cpio_ramdisk(src_dir, out_path, use_gzip=True):
+    if use_gzip:
+        cmd = f"cd '{src_dir}' && find . | cpio -o -H newc 2>/dev/null | gzip -9 > '{out_path}'"
+        label = "cpio.gz"
+    else:
+        cmd = f"cd '{src_dir}' && find . | cpio -o -H newc 2>/dev/null > '{out_path}'"
+        label = "cpio (raw)"
     result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            f"cd '{src_dir}' && find . | cpio -o -H newc 2>/dev/null | gzip -9 > '{out_path}'",
-        ],
+        ["bash", "-c", cmd],
         capture_output=True,
         text=True,
     )
@@ -168,7 +170,7 @@ def create_cpio_gz(src_dir, out_path):
         print(f"  cpio create failed: {result.stderr}")
         return False
     size = os.path.getsize(out_path)
-    print(f"  Created cpio.gz: {fmt_size(size)}")
+    print(f"  Created {label}: {fmt_size(size)}")
     return True
 
 
@@ -219,7 +221,12 @@ def parse_boot_img_ramdisk(path):
 
 
 def build_vendor_boot_v4(
-    stock_vb, merged_ramdisk_data, dtb_data, out_path, partition_size
+    stock_vb,
+    merged_ramdisk_data,
+    dtb_data,
+    out_path,
+    partition_size,
+    ramdisk_comp=1,
 ):
     pg_sz = stock_vb["pg_sz"]
     cmdline = stock_vb["cmdline"]
@@ -270,7 +277,7 @@ def build_vendor_boot_v4(
     struct.pack_into("<I", frag_entry, 4, 0)
     struct.pack_into("<I", frag_entry, 8, 1)
     frag_entry[12:44] = b"\x00" * 32
-    struct.pack_into("<I", frag_entry, 44, 1)
+    struct.pack_into("<I", frag_entry, 44, ramdisk_comp)
 
     out = bytearray(partition_size)
 
@@ -326,10 +333,14 @@ def main():
         )
 
     stock_plat_data = None
+    stock_plat_comp = 0
     for i, f in enumerate(stock["fragments"]):
         if f["type"] == 1:
             stock_plat_data = extract_fragment_data(stock, i)
-            print(f"  Stock PLATFORM: {fmt_size(len(stock_plat_data))}")
+            stock_plat_comp = f["comp"]
+            print(
+                f"  Stock PLATFORM: {fmt_size(len(stock_plat_data))} comp={f['comp_s']}"
+            )
             break
     if stock_plat_data is None:
         print("  ERROR: No PLATFORM fragment in stock!")
@@ -505,10 +516,13 @@ def main():
         else:
             print("    WARNING: default.prop not found in merged ramdisk")
 
-        merged_cpio_path = os.path.join(tmpdir, "merged.cpio.gz")
-        print("  Creating merged cpio.gz...")
-        if not create_cpio_gz(merged_dir, merged_cpio_path):
-            print("  ERROR: Failed to create merged cpio")
+        use_gzip = stock_plat_comp == 1
+        ext = "cpio.gz" if use_gzip else "cpio"
+        merged_cpio_path = os.path.join(tmpdir, f"merged.{ext}")
+        comp_label = "gzip" if use_gzip else "raw (matching stock)"
+        print(f"  Creating merged ramdisk ({comp_label})...")
+        if not create_cpio_ramdisk(merged_dir, merged_cpio_path, use_gzip=use_gzip):
+            print("  ERROR: Failed to create merged ramdisk")
             sys.exit(1)
 
         with open(merged_cpio_path, "rb") as f:
@@ -525,7 +539,14 @@ def main():
         print("  ERROR: Merged ramdisk too large for partition!")
         sys.exit(1)
 
-    build_vendor_boot_v4(stock, merged_ramdisk_data, dtb_data, out_path, partition_size)
+    build_vendor_boot_v4(
+        stock,
+        merged_ramdisk_data,
+        dtb_data,
+        out_path,
+        partition_size,
+        ramdisk_comp=stock_plat_comp,
+    )
 
     print(f"\n{'=' * 60}")
     print("  Step 5: Verify output")
