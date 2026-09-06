@@ -462,6 +462,10 @@ def main():
             with open(dp_path, errors="replace") as f:
                 dp_lines = f.readlines()
 
+            stock_orientation = stock_props.get(
+                "ro.surface_flinger.primary_display_orientation",
+                "ORIENTATION_270",
+            )
             new_lines = []
             usb_config_set = False
             sf_orientation_set = False
@@ -480,7 +484,7 @@ def main():
                 ):
                     if not sf_orientation_set:
                         new_lines.append(
-                            "ro.surface_flinger.primary_display_orientation=ORIENTATION_270\n"
+                            f"ro.surface_flinger.primary_display_orientation={stock_orientation}\n"
                         )
                         sf_orientation_set = True
                     continue
@@ -492,7 +496,7 @@ def main():
                 new_lines.append("persist.sys.usb.config=adb\n")
             if not sf_orientation_set:
                 new_lines.append(
-                    "ro.surface_flinger.primary_display_orientation=ORIENTATION_270\n"
+                    f"ro.surface_flinger.primary_display_orientation={stock_orientation}\n"
                 )
 
             missing_props = []
@@ -507,7 +511,7 @@ def main():
             len(dp_lines) - len(new_lines) + len(missing_props)
             print("    Removed persist.sys.usb.config=none lines")
             print(
-                "    Set ro.surface_flinger.primary_display_orientation=ORIENTATION_270"
+                f"    Set ro.surface_flinger.primary_display_orientation={stock_orientation}"
             )
             if missing_props:
                 print(
@@ -516,12 +520,14 @@ def main():
         else:
             print("    WARNING: default.prop not found in merged ramdisk")
 
-        use_gzip = stock_plat_comp == 1
-        ext = "cpio.gz" if use_gzip else "cpio"
-        merged_cpio_path = os.path.join(tmpdir, f"merged.{ext}")
-        comp_label = "gzip" if use_gzip else "raw (matching stock)"
-        print(f"  Creating merged ramdisk ({comp_label})...")
-        if not create_cpio_ramdisk(merged_dir, merged_cpio_path, use_gzip=use_gzip):
+        if stock_plat_comp == 0:
+            print(
+                "  Note: stock uses comp=none, but merged ramdisk too large for raw cpio"
+            )
+            print("  Using gzip compression (standard, bootloader-supported)")
+        merged_cpio_path = os.path.join(tmpdir, "merged.cpio.gz")
+        print("  Creating merged ramdisk (gzip)...")
+        if not create_cpio_ramdisk(merged_dir, merged_cpio_path, use_gzip=True):
             print("  ERROR: Failed to create merged ramdisk")
             sys.exit(1)
 
@@ -545,7 +551,7 @@ def main():
         dtb_data,
         out_path,
         partition_size,
-        ramdisk_comp=stock_plat_comp,
+        ramdisk_comp=1,
     )
 
     print(f"\n{'=' * 60}")
