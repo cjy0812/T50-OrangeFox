@@ -462,10 +462,13 @@ def main():
             with open(dp_path, errors="replace") as f:
                 dp_lines = f.readlines()
 
-            stock_orientation = stock_props.get(
-                "ro.surface_flinger.primary_display_orientation",
-                "ORIENTATION_270",
+            stock_orientation_line = stock_props.get(
+                "ro.surface_flinger.primary_display_orientation", ""
             )
+            if stock_orientation_line and "=" in stock_orientation_line:
+                stock_orientation = stock_orientation_line.split("=", 1)[1]
+            else:
+                stock_orientation = "ORIENTATION_270"
             new_lines = []
             usb_config_set = False
             sf_orientation_set = False
